@@ -37,7 +37,7 @@
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
     <Link>
-      <LibraryDependencies>wiringPi;crypto;ssl</LibraryDependencies>
+      <LibraryDependencies>wiringPi;crypto;ssl;pthread</LibraryDependencies>
     </Link>
     <RemotePostBuildEvent>
       <Command>gpio export 17 out</Command>
@@ -54,11 +54,13 @@
     </RemotePostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="message_queue.c" />
     <ClCompile Include="micomd.c" />
     <ClCompile Include="ssltest.c" />
     <ClCompile Include="uart.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="message_queue.h" />
     <ClInclude Include="micomd.h" />
     <ClInclude Include="ssltest.h" />
     <ClInclude Include="uart.h" />

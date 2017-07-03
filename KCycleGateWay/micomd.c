@@ -343,7 +343,7 @@ int main (int argc, char *argv[])
 	delay(1000);
 	digitalWrite(RST, 1);
 	printf("RST high.............\n");
-	//ipc_send_flag = 1;
+	ipc_send_flag = 0;
 #if 0
 	unsigned char digest[SHA256_DIGEST_LENGTH];
 	const char* string = "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
