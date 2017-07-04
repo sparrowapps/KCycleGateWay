@@ -54,6 +54,7 @@
     </RemotePostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="main.c" />
     <ClCompile Include="message_queue.c" />
     <ClCompile Include="micomd.c" />
     <ClCompile Include="ssltest.c" />
