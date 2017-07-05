@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "wiringpi.h": "c",
+        "md2.h": "c",
+        "pkcs7.h": "c"
+    }
+}

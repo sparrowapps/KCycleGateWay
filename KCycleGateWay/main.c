@@ -4,8 +4,8 @@ Name        : main.c
 Author      : sparrow
 Version     : 1.0
 Date        : 2017.07.03
-Copyright   : ¸· ¾²¼¼¿ä~
-Description : message_queue ¸¦ ÀÌ¿ëÇÑ worker thread pool 
+Copyright   : ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½~
+Description : message_queue ï¿½ï¿½ ï¿½Ì¿ï¿½ï¿½ï¿½ worker thread pool 
 
 main thread           : Serial read
 worker thread pool    : Serial write / http write (http request)
@@ -40,13 +40,13 @@ socket receive thread : tcp listen
 
 struct gateway_op {
 	enum { OP_WRITE_UART, OP_WRITE_HTTP, OP_EXIT } operation;
-	const char *message_txt; //Àü¼Û ¹®ÀÚ¿­
+	const char *message_txt; //ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ú¿ï¿½
 	int rfd, fd;
 };
 
 struct io_op {
-	char buf[1024]; // µ¥ÀÌÅÍ ¹öÆÛ
-	int len, pos; //±æÀÌ, Æ÷Áö¼Ç
+	char buf[1024]; // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+	int len, pos; //ï¿½ï¿½ï¿½ï¿½, ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	int fd, rfd;
 	int close_pending;
 };
@@ -69,10 +69,10 @@ static void *worker_threadproc(void *dummy) {
 		struct gateway_op *message = message_queue_read(&worker_queue);
 		switch (message->operation) {
 		case OP_WRITE_UART:
-			//generate_client_reply(message->fd, message->filename);
+			uart_write( message->fd, message->message_txt );
 			break;
 		case OP_WRITE_HTTP:
-			//copy_data(message->rfd, message->fd);
+			http_write( message->message_txt)
 			break;
 		case OP_EXIT:
 			message_queue_message_free(&worker_queue, message);
@@ -102,14 +102,14 @@ static void threadpool_destroy() {
 	message_queue_destroy(&worker_queue);
 }
 
-// ¸ÞÀÎ½º·¹µå ±ú¿ì±â
+// ï¿½ï¿½ï¿½Î½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½
 static void wake_main_thread() {
 	if (__sync_lock_test_and_set(&main_blocked, 0)) {
 		pthread_kill(main_thread, SIGUSR1);
 	}
 }
 
-//MARK:  ±â´É ÇÔ¼ö
+//MARK:  ï¿½ï¿½ï¿½ ï¿½Ô¼ï¿½
 
 // uart write packet
 int write_packet(int fd, unsigned char* pbuf, int size) {
@@ -190,8 +190,41 @@ static void handle_uart_data(int fd) {
 }
 
 
+static void handle_uart_request(int fd, char *request) {
+	// parse and cmd process
+
+	// UART cmd ? HTTP cmd ?
+	if(!strncmp(request, "UART", 4)) {
+		char *msg_txt = request+4;
+
+		struct gateway_op *message = message_queue_message_alloc_blocking(&worker_queue);
+		message->operation = OP_WRITE_UART;
+		message->message_txt = msg_txt;
+		message->fd = fd;
+		message_queue_write(&worker_queue, message);
+	} else if (!strncmp(request, "HTTP", 4)) {
+		char *msg_txt = request+4;
+
+		struct gateway_op *message = message_queue_message_alloc_blocking(&worker_queue);
+		message->operation = OP_WRITE_HTTP;
+		message->message_txt = msg_txt;
+		message->fd = fd;
+		message_queue_write(&worker_queue, message);	
+	} else {
+		close(fd);
+	}
+}
+
+static void uart_write(int fd, const char *msg) {
+	int r = write_packet(fd, msg, strlen(msg));
+}
+
+static void http_write(const char *msg) {
+	int r = ssl_write( msg, strlen(msg) );
+}
+
 // MARK: uart open 
-static int get_uart_fd() {
+static int open_uart() {
 	int uart_fd;
 
 	do {
@@ -225,4 +258,39 @@ static int init_wiringPi() {
 	printf("RST high.............\n");
 
 	return 0;
+}
+
+static void service_io_message_queue() {
+	struct io_op *message;
+	while(message = message_queue_tryread(&io_queue)) {
+		uart_data[message->fd].state = CLIENT_WRITING;
+		uart_data[message->fd].write_op = message;
+	}
+}
+
+static void handle_signal(int signal) {
+}
+
+int main(int argc, char *argv[]) {
+	main_thread = pthread_self();
+	signal(SIGUSR1, &handle_signal);
+	signal(SIGPIPE, SIG_IGN);
+	message_queue_init(&io_queue, sizeof(struct io_op), 128);
+	threadpool_init();
+	int fd = open_uart();
+
+	if (fd >=0 ) {
+		while(1) {
+			fd_set rfds, wfds;
+			int max_fd, r;
+			main_blocked = 1;
+			__sync_synchronize();
+			service_io_message_queue(); //main thread io_message queue
+			FD_ZERO(&rfds);
+			FD_ZERO(&wfds);
+			max_fd = 0;
+			FD_SET(fd, &rfds);
+		}
+	}
+	
 }
