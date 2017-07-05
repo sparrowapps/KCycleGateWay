@@ -61,6 +61,8 @@ int write_packet (int fd, PBYTE pbuf, int size);
 int extract_packet (int cnt, PBYTE buf);
 int encrypt_block(unsigned char* cipherText, unsigned char* plainText, unsigned int plainTextLen, unsigned char* key, unsigned char* ivec);
 int decrypt_block(unsigned char* plainText, unsigned char* cipherText, unsigned int cipherTextLen, unsigned char* key, unsigned char* ivec);
-
+int ssl_write(unsigned char * msg, int size);
+int init_wiringPi();
+int open_uart();
 #endif /* _MICOM_H_ */
 

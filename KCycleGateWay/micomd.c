@@ -280,7 +280,69 @@ Accept-Language: ko-KR,ko;q=0.8,en-US;q=0.6,en;q=0.4\n\
 	return 0;
 }
 
+// ssl http write 
+int ssl_write(unsigned char * msg, int size) {
 
+	char buf[10000];
+	int bytes;
+
+	SSL_OPEN_TO_SERVER sslOpenToServer;
+
+	if (SSLOpenToServer(&sslOpenToServer, "192.168.137.1", "8443") != SSL_OPEN_TO_SERVER_SUCCESS)
+	{
+		puts("SSLOpenToServer fail\n");
+		return -1;
+	}
+
+	SSL_write(sslOpenToServer.ssl, msg, strlen(msg));
+	BIO_dump_fp(stdout, msg, strlen(msg));
+
+	bytes = SSL_read(sslOpenToServer.ssl, buf, sizeof(buf));
+	buf[bytes] = 0;
+	BIO_dump_fp(stdout, buf, bytes);
+
+	SSLCloseToServer(&sslOpenToServer);
+
+	return 0;
+}
+
+// MARK: wiringPI
+int init_wiringPi() {
+	if (wiringPiSetup() == -1)
+		return -1;
+
+	pinMode(PIO, OUTPUT);
+	pinMode(RST, OUTPUT);
+
+	digitalWrite(PIO, 1);
+	delay(100);
+	digitalWrite(RST, 1);
+	delay(1000);
+	digitalWrite(RST, 0);
+	printf("RST low.............\n");
+	delay(1000);
+	digitalWrite(RST, 1);
+	printf("RST high.............\n");
+
+	return 0;
+}
+
+// MARK: uart open 
+int open_uart() {
+	int uart_fd;
+
+	do {
+		uart_fd = uart_open();
+		if (uart_fd < 0) {
+			printf("UART open failed!\n");
+		}
+	} while (uart_fd < 0);
+
+	return uart_fd;
+}
+
+
+#if 0
 int main (int argc, char *argv[])
 {
 	int maxfd;
@@ -498,6 +560,8 @@ int main (int argc, char *argv[])
 
 	return 0;
 }
+#endif
+
 
 int create_socket (int portnum)
 {
