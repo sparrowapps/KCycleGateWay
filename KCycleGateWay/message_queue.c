@@ -35,8 +35,6 @@
 #include <fcntl.h>
 #include <errno.h>
 
-extern int errno;
-
 union padding {
 	char chardata;
 	short shortdata;

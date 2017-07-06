@@ -117,9 +117,6 @@ static void wake_main_thread() {
 	}
 }
 
-
-
-
 // MARK: uart data processing
 struct uart_state {
 	enum { UART_INACTIVE, UART_READING, UART_WRITING } state;
@@ -130,6 +127,8 @@ struct uart_state {
 
 struct uart_state uart_data[FD_SETSIZE];
 
+// uart 에서 데이터를 읽는 다.
+// read_packet() 함수를 사용 하지 않는다.
 static void handle_uart_data(int fd) {
 	int r;
 	if ((r = read(fd, uart_data[fd].buf + uart_data[fd].pos, 1024 - uart_data[fd].pos)) > 0) {
@@ -209,6 +208,11 @@ int main(int argc, char *argv[]) {
 	signal(SIGPIPE, SIG_IGN);
 	message_queue_init(&io_queue, sizeof(struct io_op), 128);
 	threadpool_init();
+	if (init_wiringPi() == -1) {
+		printf("wirig pi failed\n");
+		return -1;
+	}
+
 	int fd = open_uart();
 
 	if (fd >=0 ) {
@@ -222,6 +226,66 @@ int main(int argc, char *argv[]) {
 			FD_ZERO(&wfds);
 			max_fd = 0;
 			FD_SET(fd, &rfds);
+
+			for (int i = 0; i<FD_SETSIZE; ++i) {
+				if (uart_data[i].state == UART_READING) {
+					FD_SET(i, &rfds);
+					max_fd = i;
+				}
+				else if (uart_data[i].state == UART_WRITING) {
+					FD_SET(i, &wfds);
+					max_fd = i;
+				}
+			}
+
+			max_fd = fd > max_fd ? fd : max_fd;
+			r = select(max_fd + 1, &rfds, &wfds, NULL, NULL);
+			main_blocked = 0;
+			__sync_synchronize();
+
+			if (r < 0 && errno != EINTR) {
+				perror("Error in select");
+				return -1;
+			}
+			if (r > 0) {
+				if (FD_ISSET(fd, &rfds)) {
+						uart_data[fd].state = UART_READING;
+						uart_data[fd].pos = 0;
+				}
+				for (int i = 0; i<FD_SETSIZE; ++i) {
+					if (i != fd && FD_ISSET(i, &rfds)) {
+						handle_uart_data(i);
+					}
+					else if (i != fd && FD_ISSET(i, &wfds)) { // 시리얼 write
+						int r = write(i, uart_data[i].write_op->buf + uart_data[i].write_op->pos, uart_data[i].write_op->len - uart_data[i].write_op->pos);
+						if (r >= 0) {
+							uart_data[i].write_op->pos += r;
+							if (uart_data[i].write_op->pos == uart_data[i].write_op->len) {
+								uart_data[i].state = UART_INACTIVE;
+								if (uart_data[i].write_op->close_pending) {
+									close(uart_data[i].write_op->rfd);
+									close(i);
+								}
+								else {
+									struct gateway_op *message = message_queue_message_alloc_blocking(&worker_queue);
+									message->operation = OP_WRITE_UART;
+									message->fd = i;
+									message->rfd = uart_data[i].write_op->rfd;
+									message_queue_write(&worker_queue, message);
+								}
+								message_queue_message_free(&io_queue, uart_data[i].write_op);
+							}
+						}
+						else {
+							close(uart_data[i].write_op->rfd);
+							close(i);
+							message_queue_message_free(&io_queue, uart_data[i].write_op);
+							uart_data[i].state = UART_INACTIVE;
+						}
+					}
+				}
+			}
+
 		}
 	}
 	

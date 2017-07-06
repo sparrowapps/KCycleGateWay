@@ -69,6 +69,7 @@ struct message_queue {
 extern "C" {
 #endif
 
+extern int errno;
 /**
  * \brief Initialize a message queue structure
  *
