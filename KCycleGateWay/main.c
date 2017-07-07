@@ -155,30 +155,48 @@ static void handle_uart_data(int fd) {
 	}
 }
 
-
+extern int list_end;
+extern int cmd_state;
+extern int data_status;
 static void handle_uart_request(int fd, char *request) {
 	// parse and cmd process
+	int uart_cnt = 0;
+	if (parse_data(request , &uart_cnt) == 1) {
 
-	// UART cmd ? HTTP cmd ?
-	if(!strncmp(request, "UART", 4)) {
-		char *msg_txt = request+4;
+		if (uart_cnt >0  || (cmd_state == 13 && list_end == 1) ) {
+			if (data_status == 0) {
+				check_rf_data(request);
+			} else {
+				check_uart(request);
+			}
+			
+		}
 
-		struct gateway_op *message = message_queue_message_alloc_blocking(&worker_queue);
-		message->operation = OP_WRITE_UART;
-		message->message_txt = msg_txt;
-		message->fd = fd;
-		message_queue_write(&worker_queue, message);
-	} else if (!strncmp(request, "HTTP", 4)) {
-		char *msg_txt = request+4;
+		// UART cmd ? HTTP cmd ?
+		if(!strncmp(request, "UART", 4)) {
+			char *msg_txt = request+4;
 
-		struct gateway_op *message = message_queue_message_alloc_blocking(&worker_queue);
-		message->operation = OP_WRITE_HTTP;
-		message->message_txt = msg_txt;
-		message->fd = fd;
-		message_queue_write(&worker_queue, message);	
+			struct gateway_op *message = message_queue_message_alloc_blocking(&worker_queue);
+			message->operation = OP_WRITE_UART;
+			message->message_txt = msg_txt;
+			message->fd = fd;
+			message_queue_write(&worker_queue, message);
+		} else if (!strncmp(request, "HTTP", 4)) {
+			char *msg_txt = request+4;
+
+			struct gateway_op *message = message_queue_message_alloc_blocking(&worker_queue);
+			message->operation = OP_WRITE_HTTP;
+			message->message_txt = msg_txt;
+			message->fd = fd;
+			message_queue_write(&worker_queue, message);	
+		} else {
+			close(fd);
+		}
+
 	} else {
-		close(fd);
+		return;
 	}
+
 }
 
 static void uart_write(int fd, const char *msg) {
@@ -188,8 +206,6 @@ static void uart_write(int fd, const char *msg) {
 static void http_write(const char *msg) {
 	int r = ssl_write( msg, strlen(msg) );
 }
-
-
 
 static void service_io_message_queue() {
 	struct io_op *message;
@@ -256,37 +272,12 @@ int main(int argc, char *argv[]) {
 					if (i != fd && FD_ISSET(i, &rfds)) {
 						handle_uart_data(i);
 					}
-					else if (i != fd && FD_ISSET(i, &wfds)) { // 시리얼 write
-						int r = write(i, uart_data[i].write_op->buf + uart_data[i].write_op->pos, uart_data[i].write_op->len - uart_data[i].write_op->pos);
-						if (r >= 0) {
-							uart_data[i].write_op->pos += r;
-							if (uart_data[i].write_op->pos == uart_data[i].write_op->len) {
-								uart_data[i].state = UART_INACTIVE;
-								if (uart_data[i].write_op->close_pending) {
-									close(uart_data[i].write_op->rfd);
-									close(i);
-								}
-								else {
-									struct gateway_op *message = message_queue_message_alloc_blocking(&worker_queue);
-									message->operation = OP_WRITE_UART;
-									message->fd = i;
-									message->rfd = uart_data[i].write_op->rfd;
-									message_queue_write(&worker_queue, message);
-								}
-								message_queue_message_free(&io_queue, uart_data[i].write_op);
-							}
-						}
-						else {
-							close(uart_data[i].write_op->rfd);
-							close(i);
-							message_queue_message_free(&io_queue, uart_data[i].write_op);
-							uart_data[i].state = UART_INACTIVE;
-						}
-					}
 				}
 			}
-
+			service_io_message_queue()
 		}
+	} else {
+		perror("Error listening on uart ")
 	}
 	
 }
