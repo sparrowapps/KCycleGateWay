@@ -77,6 +77,11 @@
     <ClCompile>
       <AdditionalIncludeDirectories>C:\SysGCC\Raspberry\arm-linux-gnueabihf\include\asm;C:\SysGCC\Raspberry\arm-linux-gnueabihf\sysroot\usr\include;C:\SysGCC\Raspberry\arm-linux-gnueabihf\include;C:\kcycle\KCycleGateWay\KCycleGateWay\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
+    <Link>
+      <AdditionalOptions>
+      </AdditionalOptions>
+      <NoExecStackRequired>false</NoExecStackRequired>
+    </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />

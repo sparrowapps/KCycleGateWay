@@ -6,7 +6,6 @@ Version     : 1.0
 Date        : 2017.07.03
 Copyright   : 
 Description : 
-
 main thread           : Serial read
 worker thread pool    : Serial write / http write (http request)
 socket receive thread : tcp listen
@@ -65,6 +64,8 @@ static struct message_queue io_queue;
 static pthread_t main_thread;
 static pthread_t worker_threads[WORKER_THREADS];
 
+static pthread_t socke_thread; //소켓 수신대기 스레드 
+
 static int main_blocked;
 
 /*
@@ -90,6 +91,7 @@ static void *worker_threadproc(void *dummy) {
 	}
 	return NULL;
 }
+
 
 static void threadpool_init() {
 	message_queue_init(&worker_queue, sizeof(struct gateway_op), 512);
@@ -117,6 +119,44 @@ static void wake_main_thread() {
 	}
 }
 
+
+static void *socket_threadproc(void * dummy) {
+	int server_sockfd, client_sockfd = 0;
+	int state = 0;
+
+	server_sockfd = create_socket(PORT_NUM);
+	if (server_sockfd >= 0) {
+		while (1) {
+			int max_fd, r;
+			fd_set readfds, wfds;
+			FD_ZERO(&readfds);
+			r = select(max_fd + 1, &readfds, &wfds, NULL, NULL );
+			if (r >= 0) {
+				if (FD_ISSET(server_sockfd, &readfds)) {
+					// message queue workthead toss
+					struct gateway_op *message = message_queue_message_alloc_blocking(&worker_queue);
+					message->operation = OP_WRITE_HTTP;
+					//message->fd = 
+					//message->rfd
+					message_queue_write(&worker_queue, message);
+
+				}
+				
+			}
+			
+		}
+	}
+}
+
+static void socket_thread_init() {
+	pthread_create(&socke_thread, NULL, &socket_threadproc, NULL);
+}
+
+static void socket_thread_destroy() {
+	pthread_join(socke_thread, NULL);
+}
+
+
 // MARK: uart data processing
 struct uart_state {
 	enum { UART_INACTIVE, UART_READING, UART_WRITING } state;
@@ -138,16 +178,21 @@ static void handle_uart_data(int fd) {
 		//if (uart_data[fd].pos >= 4 && !strncmp(uart_data[fd].buf + uart_data[fd].pos - 4, "\r\n\r\n", 4)) {
 
 		//2글자의 시작 문자로 판단
+/*
 		if (uart_data[fd].pos >= 2 && 
 			((uart_data[fd].buf + uart_data[fd].pos - 2) == 0x0D) &&
 			((uart_data[fd].buf + uart_data[fd].pos - 1) == 0x0A)
 			) 
 		{
+			printf("uart request read\n");
+
 			uart_data[fd].buf[uart_data[fd].pos] = '\0';
 			uart_data[fd].state = UART_INACTIVE;
 			handle_uart_request(fd, uart_data[fd].buf);
 			return;
 		}
+*/
+		handle_uart_request(fd, uart_data[fd].buf);
 	}
 	else {
 		uart_data[fd].state = UART_INACTIVE;
@@ -164,6 +209,7 @@ static void handle_uart_request(int fd, char *request) {
 	if (parse_data(request , &uart_cnt) == 1) {
 
 		if (uart_cnt >0  || (cmd_state == 13 && list_end == 1) ) {
+			printf("handle_uart_request\n");
 			if (data_status == 0) {
 				check_rf_data(request);
 			} else {
@@ -223,7 +269,10 @@ int main(int argc, char *argv[]) {
 	signal(SIGUSR1, &handle_signal);
 	signal(SIGPIPE, SIG_IGN);
 	message_queue_init(&io_queue, sizeof(struct io_op), 128);
+	
 	threadpool_init();
+	socket_thread_init();
+
 	if (init_wiringPi() == -1) {
 		printf("wirig pi failed\n");
 		return -1;
@@ -267,17 +316,14 @@ int main(int argc, char *argv[]) {
 				if (FD_ISSET(fd, &rfds)) {
 						uart_data[fd].state = UART_READING;
 						uart_data[fd].pos = 0;
-				}
-				for (int i = 0; i<FD_SETSIZE; ++i) {
-					if (i != fd && FD_ISSET(i, &rfds)) {
-						handle_uart_data(i);
-					}
+
+						handle_uart_data(fd);
 				}
 			}
-			service_io_message_queue()
+			service_io_message_queue();
 		}
 	} else {
-		perror("Error listening on uart ")
+		perror("Error listening on uart ");
 	}
 	
 }
