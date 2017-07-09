@@ -259,3 +259,14 @@ paket-files/
 # Python Tools for Visual Studio (PTVS)
 __pycache__/
 *.pyc
+KCycleGateWay/build/KCycleGateWay
+KCycleGateWay/build/main.d
+KCycleGateWay/build/main.o
+KCycleGateWay/build/message_queue.d
+KCycleGateWay/build/message_queue.o
+KCycleGateWay/build/micomd.d
+KCycleGateWay/build/micomd.o
+KCycleGateWay/build/ssltest.d
+KCycleGateWay/build/ssltest.o
+KCycleGateWay/build/uart.d
+KCycleGateWay/build/uart.o
