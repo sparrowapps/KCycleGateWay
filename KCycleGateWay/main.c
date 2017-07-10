@@ -6,9 +6,15 @@ Version     : 1.0
 Date        : 2017.07.03
 Copyright   : 
 Description : 
-main thread           : Serial read
-worker thread pool    : Serial write / http write (http request)
-socket receive thread : tcp listen
+
+serial read thread
+socket listen thread 
+uart write thread
+http write thread
+
+serial read --> uart write thread
+serial read --> http write thread --> (http read) --> uart write thread
+socket read (ack) --> http write thread --> (http read) --> uart write thread
 ============================================================================
 
 */
@@ -39,10 +45,6 @@ static void http_write(const char *msg);
 
 // Message queue related code
 
-#ifndef WORKER_THREADS
-#define WORKER_THREADS 32
-#endif
-
 // 메인 스레드 <---> 스레드 풀( 시리얼 write, http write 명령 컨텍스트)
 struct gateway_op {
 	enum { OP_WRITE_UART, OP_WRITE_HTTP, OP_EXIT } operation;
@@ -61,54 +63,61 @@ struct io_op {
 static struct message_queue worker_queue;
 static struct message_queue io_queue;
 
-static pthread_t main_thread;
-static pthread_t worker_threads[WORKER_THREADS];
-
-static pthread_t socke_thread; //소켓 수신대기 스레드 
+static pthread_t main_thread; //serial read
+static pthread_t socket_read_thread; //소켓 수신대기 스레드 
+static pthread_t uart_write_thread;
+static pthread_t http_write_thread;
 
 static int main_blocked;
 
-/*
-worker thread 
-uart write
-http request
-*/
-static void *worker_threadproc(void *dummy) {
+static void *uart_write_threadproc(void *dummy) {
 	while (1) {
 		struct gateway_op *message = message_queue_read(&worker_queue);
-		switch (message->operation) {
-		case OP_WRITE_UART:
-			uart_write( message->fd, message->message_txt );
-			break;
-		case OP_WRITE_HTTP:
-			http_write(message->message_txt);
-			break;
-		case OP_EXIT:
-			message_queue_message_free(&worker_queue, message);
-			return NULL;
-		}
+		uart_write( message->fd, message->message_txt );
+		message_queue_message_free(&worker_queue, message);
+	}
+	return NULL;
+}
+
+static void *http_write_threadproc(void *dummy) {
+	while (1) {
+		struct gateway_op *message = message_queue_read(&worker_queue);
+		http_write( message->message_txt );
+		message_queue_message_free(&worker_queue, message);
+	}
+	return NULL;
+}
+
+static void *socket_read_threadproc(void *dummy) {
+	while (1) {
+		struct gateway_op *message = message_queue_read(&worker_queue);
+		// socket read 
+		//http_write( message->message_txt );
 		message_queue_message_free(&worker_queue, message);
 	}
 	return NULL;
 }
 
 
-static void threadpool_init() {
+
+static void thread_init() {
 	message_queue_init(&worker_queue, sizeof(struct gateway_op), 512);
-	for (int i = 0; i<WORKER_THREADS; ++i) {
-		pthread_create(&worker_threads[i], NULL, &worker_threadproc, NULL);
-	}
+	
+	pthread_create(&uart_write_thread, NULL, &uart_write_threadproc, NULL);
+	pthread_create(&http_write_thread, NULL, &http_write_threadproc, NULL);
+	pthread_create(&socket_read_thread, NULL, &socket_read_threadproc, NULL);
 }
 
 static void threadpool_destroy() {
-	for (int i = 0; i<WORKER_THREADS; ++i) {
-		struct gateway_op *poison = message_queue_message_alloc_blocking(&worker_queue);
-		poison->operation = OP_EXIT;
-		message_queue_write(&worker_queue, poison);
-	}
-	for (int i = 0; i<WORKER_THREADS; ++i) {
-		pthread_join(worker_threads[i], NULL);
-	}
+	
+	struct gateway_op *poison = message_queue_message_alloc_blocking(&worker_queue);
+	poison->operation = OP_EXIT;
+	message_queue_write(&worker_queue, poison);
+	
+	
+	
+	pthread_join(worker_threads[i], NULL);
+	
 	message_queue_destroy(&worker_queue);
 }
 
