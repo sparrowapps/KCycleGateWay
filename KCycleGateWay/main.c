@@ -151,23 +151,11 @@ static void *socket_read_threadproc(void *dummy) {
 						} else {
 							//client_fd = client_sockfd;
 							printf("App Framework socket connected[fd = %d, cnt_fd = %d]!!!\n", client_sockfd, cnt_fd_socket);
+							handle_socket_data(client_sockfd); // socket 수신 처리
 						}
-
 					}
-
-
-
-					// message queue workthead toss
-					struct gateway_op *message = message_queue_message_alloc_blocking(&worker_queue);
-					message->operation = OP_WRITE_HTTP;
-					//message->fd = 
-					//message->rfd
-					message_queue_write(&worker_queue, message);
-
 				}
-				
 			}
-			
 		}
 	}
 	return NULL;
@@ -188,14 +176,30 @@ static void handle_socket_data(int fd) {
 	int r;
 	if((r = read(fd, socket_data[fd].buf+socket_data[fd].pos, 1024-socket_data[fd].pos)) > 0) {
 		client_data[fd].pos += r;
-		if(socket_data[fd].pos >= 4 && !strncmp(socket_data[fd].buf+socket_data[fd].pos-4, "\r\n\r\n", 4)) {
+		if(socket_data[fd].pos >= 4 ) {
 			socket_data[fd].buf[socket_data[fd].pos] = '\0';
 			socket_data[fd].state = SOCKET_INACTIVE;
-			
+			// 수신데이터 처리
 			return;
 		}
 	} else {
 		client_data[fd].state = SOCKET_INACTIVE;
+		close(fd);
+	}
+}
+
+static void handle_socket_request(int fd, char *request) {
+	//ack
+	write(fd,"ack",3);
+
+	if(!strncmp(request, "HELLO", 5)) {
+		struct gateway_op *message = message_queue_message_alloc_blocking(&worker_queue);
+		message->operation = OP_WRITE_HTTP;
+		message->message_txt = "HELLO";
+		message->fd = fd;
+		message_queue_write(&worker_queue, message);
+		close(fd);
+	} else {
 		close(fd);
 	}
 }
