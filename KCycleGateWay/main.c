@@ -39,6 +39,8 @@ socket read (ack) --> http write thread --> (http read) --> uart write thread
 // function prototype
 static void handle_uart_data(int fd);
 static void handle_uart_request(int fd, char *request);
+static void handle_socket_data(int fd);
+static void handle_socket_request(int fd, char *request);
 static void uart_write(int fd, const char *msg);
 static void http_write(const char *msg);
 
@@ -99,37 +101,12 @@ static void *http_write_threadproc(void *dummy) {
 	return NULL;
 }
 
-static void threads_init() {
-	message_queue_init(&worker_queue, sizeof(struct gateway_op), 512);
-	
-	pthread_create(&uart_write_thread, NULL, &uart_write_threadproc, NULL);
-	pthread_create(&http_write_thread, NULL, &http_write_threadproc, NULL);
-	pthread_create(&socket_read_thread, NULL, &socket_read_threadproc, NULL);
-}
-
-static void threads_destroy() {
-	struct gateway_op *poison = message_queue_message_alloc_blocking(&worker_queue);
-	poison->operation = OP_EXIT;
-	message_queue_write(&worker_queue, poison);
-	
-	pthread_join(uart_write_thread, NULL);
-	pthread_join(http_write_thread, NULL);
-	pthread_join(socket_read_thread, NULL);
-
-	message_queue_destroy(&worker_queue);
-}
-
-static void wake_main_thread() {
-	if (__sync_lock_test_and_set(&main_blocked, 0)) {
-		pthread_kill(main_thread, SIGUSR1);
-	}
-}
-
+extern int cnt_fd_socket;
 static void *socket_read_threadproc(void *dummy) {
 	int server_sockfd, client_sockfd = 0;
 	int state = 0;
 	struct sockaddr_in clientaddr;
-	client_len = sizeof(clientaddr);
+	int client_len = sizeof(clientaddr);
 
 	server_sockfd = create_socket(PORT_NUM);
 	if (server_sockfd >= 0) {
@@ -161,6 +138,34 @@ static void *socket_read_threadproc(void *dummy) {
 	return NULL;
 }
 
+
+static void threads_init() {
+	message_queue_init(&worker_queue, sizeof(struct gateway_op), 512);
+	
+	pthread_create(&uart_write_thread, NULL, &uart_write_threadproc, NULL);
+	pthread_create(&http_write_thread, NULL, &http_write_threadproc, NULL);
+	pthread_create(&socket_read_thread, NULL, &socket_read_threadproc, NULL);
+}
+
+static void threads_destroy() {
+	struct gateway_op *poison = message_queue_message_alloc_blocking(&worker_queue);
+	poison->operation = OP_EXIT;
+	message_queue_write(&worker_queue, poison);
+	
+	pthread_join(uart_write_thread, NULL);
+	pthread_join(http_write_thread, NULL);
+	pthread_join(socket_read_thread, NULL);
+
+	message_queue_destroy(&worker_queue);
+}
+
+static void wake_main_thread() {
+	if (__sync_lock_test_and_set(&main_blocked, 0)) {
+		pthread_kill(main_thread, SIGUSR1);
+	}
+}
+
+
 // MARK: uart data processing
 struct socket_state {
 	enum { SOCKET_INACTIVE, SOCKET_READING, SOCKET_WRITING } state;
@@ -175,15 +180,16 @@ struct socket_state socket_data[FD_SETSIZE];
 static void handle_socket_data(int fd) {
 	int r;
 	if((r = read(fd, socket_data[fd].buf+socket_data[fd].pos, 1024-socket_data[fd].pos)) > 0) {
-		client_data[fd].pos += r;
+		socket_data[fd].pos += r;
 		if(socket_data[fd].pos >= 4 ) {
 			socket_data[fd].buf[socket_data[fd].pos] = '\0';
 			socket_data[fd].state = SOCKET_INACTIVE;
 			// 수신데이터 처리
+			handle_socket_request(fd, socket_data[fd].buf);
 			return;
 		}
 	} else {
-		client_data[fd].state = SOCKET_INACTIVE;
+		socket_data[fd].state = SOCKET_INACTIVE;
 		close(fd);
 	}
 }
@@ -317,8 +323,7 @@ int main(int argc, char *argv[]) {
 	signal(SIGPIPE, SIG_IGN);
 	message_queue_init(&io_queue, sizeof(struct io_op), 128);
 	
-	threadpool_init();
-	socket_thread_init();
+	threads_init();
 
 	if (init_wiringPi() == -1) {
 		printf("wirig pi failed\n");
