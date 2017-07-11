@@ -36,7 +36,6 @@ socket read (ack) --> http write thread --> (http read) --> uart write thread
 #include "wiringPi.h"
 #include "micomd.h"
 
-
 // function prototype
 static void handle_uart_data(int fd);
 static void handle_uart_request(int fd, char *request);
@@ -73,8 +72,15 @@ static int main_blocked;
 static void *uart_write_threadproc(void *dummy) {
 	while (1) {
 		struct gateway_op *message = message_queue_read(&worker_queue);
-		uart_write( message->fd, message->message_txt );
-		message_queue_message_free(&worker_queue, message);
+
+		if ( message->operation == OP_WRITE_HTTP ) {
+			uart_write( message->fd, message->message_txt );
+			message_queue_message_free(&worker_queue, message);
+		} else if ( message->operation == OP_EXIT ) {
+			message_queue_message_free(&worker_queue, message);
+			return NULL;
+		}
+		
 	}
 	return NULL;
 }
@@ -82,25 +88,18 @@ static void *uart_write_threadproc(void *dummy) {
 static void *http_write_threadproc(void *dummy) {
 	while (1) {
 		struct gateway_op *message = message_queue_read(&worker_queue);
-		http_write( message->message_txt );
-		message_queue_message_free(&worker_queue, message);
+		if ( message->operation == OP_WRITE_HTTP ) { 
+			http_write( message->message_txt );
+			message_queue_message_free(&worker_queue, message);
+		} else if ( message->operation == OP_EXIT ) {
+			message_queue_message_free(&worker_queue, message);
+			return NULL;
+		}
 	}
 	return NULL;
 }
 
-static void *socket_read_threadproc(void *dummy) {
-	while (1) {
-		struct gateway_op *message = message_queue_read(&worker_queue);
-		// socket read 
-		//http_write( message->message_txt );
-		message_queue_message_free(&worker_queue, message);
-	}
-	return NULL;
-}
-
-
-
-static void thread_init() {
+static void threads_init() {
 	message_queue_init(&worker_queue, sizeof(struct gateway_op), 512);
 	
 	pthread_create(&uart_write_thread, NULL, &uart_write_threadproc, NULL);
@@ -108,26 +107,23 @@ static void thread_init() {
 	pthread_create(&socket_read_thread, NULL, &socket_read_threadproc, NULL);
 }
 
-static void threadpool_destroy() {
-	
+static void threads_destroy() {
 	struct gateway_op *poison = message_queue_message_alloc_blocking(&worker_queue);
 	poison->operation = OP_EXIT;
 	message_queue_write(&worker_queue, poison);
 	
-	
-	
-	pthread_join(worker_threads[i], NULL);
-	
+	pthread_join(uart_write_thread, NULL);
+	pthread_join(http_write_thread, NULL);
+	pthread_join(socket_read_thread, NULL);
+
 	message_queue_destroy(&worker_queue);
 }
-
 
 static void wake_main_thread() {
 	if (__sync_lock_test_and_set(&main_blocked, 0)) {
 		pthread_kill(main_thread, SIGUSR1);
 	}
 }
-
 
 static void *socket_threadproc(void * dummy) {
 	int server_sockfd, client_sockfd = 0;
@@ -157,14 +153,15 @@ static void *socket_threadproc(void * dummy) {
 	}
 }
 
-static void socket_thread_init() {
-	pthread_create(&socke_thread, NULL, &socket_threadproc, NULL);
+static void *socket_read_threadproc(void *dummy) {
+	while (1) {
+		struct gateway_op *message = message_queue_read(&worker_queue);
+		// socket read 
+		//http_write( message->message_txt );
+		message_queue_message_free(&worker_queue, message);
+	}
+	return NULL;
 }
-
-static void socket_thread_destroy() {
-	pthread_join(socke_thread, NULL);
-}
-
 
 // MARK: uart data processing
 struct uart_state {
@@ -334,7 +331,6 @@ int main(int argc, char *argv[]) {
 	} else {
 		perror("Error listening on uart ");
 	}
-	
 }
 
 
