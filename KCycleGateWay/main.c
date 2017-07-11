@@ -125,9 +125,11 @@ static void wake_main_thread() {
 	}
 }
 
-static void *socket_threadproc(void * dummy) {
+static void *socket_read_threadproc(void *dummy) {
 	int server_sockfd, client_sockfd = 0;
 	int state = 0;
+	struct sockaddr_in clientaddr;
+	client_len = sizeof(clientaddr);
 
 	server_sockfd = create_socket(PORT_NUM);
 	if (server_sockfd >= 0) {
@@ -138,6 +140,23 @@ static void *socket_threadproc(void * dummy) {
 			r = select(max_fd + 1, &readfds, &wfds, NULL, NULL );
 			if (r >= 0) {
 				if (FD_ISSET(server_sockfd, &readfds)) {
+
+					client_sockfd = accept(server_sockfd, (struct sockaddr *)&clientaddr, &client_len);
+
+					if (client_sockfd < 0 ) {
+						printf("Failed to accept the connection request from App Framework!\n");
+					} else {
+						if (add_socket(client_sockfd) == -1) {
+							printf("Failed to add socket because of the number of socket(%d) !! \n", cnt_fd_socket);
+						} else {
+							//client_fd = client_sockfd;
+							printf("App Framework socket connected[fd = %d, cnt_fd = %d]!!!\n", client_sockfd, cnt_fd_socket);
+						}
+
+					}
+
+
+
 					// message queue workthead toss
 					struct gateway_op *message = message_queue_message_alloc_blocking(&worker_queue);
 					message->operation = OP_WRITE_HTTP;
@@ -151,16 +170,34 @@ static void *socket_threadproc(void * dummy) {
 			
 		}
 	}
+	return NULL;
 }
 
-static void *socket_read_threadproc(void *dummy) {
-	while (1) {
-		struct gateway_op *message = message_queue_read(&worker_queue);
-		// socket read 
-		//http_write( message->message_txt );
-		message_queue_message_free(&worker_queue, message);
+// MARK: uart data processing
+struct socket_state {
+	enum { SOCKET_INACTIVE, SOCKET_READING, SOCKET_WRITING } state;
+	char buf[1024];
+	int pos;
+	struct io_op *write_op;
+};
+
+struct socket_state socket_data[FD_SETSIZE];
+
+// socket read
+static void handle_socket_data(int fd) {
+	int r;
+	if((r = read(fd, socket_data[fd].buf+socket_data[fd].pos, 1024-socket_data[fd].pos)) > 0) {
+		client_data[fd].pos += r;
+		if(socket_data[fd].pos >= 4 && !strncmp(socket_data[fd].buf+socket_data[fd].pos-4, "\r\n\r\n", 4)) {
+			socket_data[fd].buf[socket_data[fd].pos] = '\0';
+			socket_data[fd].state = SOCKET_INACTIVE;
+			
+			return;
+		}
+	} else {
+		client_data[fd].state = SOCKET_INACTIVE;
+		close(fd);
 	}
-	return NULL;
 }
 
 // MARK: uart data processing
