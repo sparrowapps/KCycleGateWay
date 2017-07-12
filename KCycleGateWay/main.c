@@ -50,19 +50,11 @@ static void http_write(const char *msg);
 struct gateway_op {
 	enum { OP_WRITE_UART, OP_WRITE_HTTP, OP_EXIT } operation;
 	const char *message_txt; //
-	//int rfd, fd;
+	int fd;
 };
 
-// 메인 스레드 <--- 입출력 컨텍스트
-// struct io_op {
-// 	char buf[1024]; //
-// 	int len, pos; //
-// 	int fd, rfd;
-// 	int close_pending;
-// };
 
-static str uct message_queue worker_queue;
-static struct message_queue io_queue;
+static struct message_queue worker_queue;
 
 static pthread_t main_thread; //serial read
 static pthread_t socket_read_thread; //소켓 수신대기 스레드 
@@ -72,6 +64,7 @@ static pthread_t http_write_thread;
 static int main_blocked;
 
 static void *uart_write_threadproc(void *dummy) {
+	printf("uart_write_threadproc start\n");
 	while (1) {
 		struct gateway_op *message = message_queue_read(&worker_queue);
 
@@ -88,9 +81,11 @@ static void *uart_write_threadproc(void *dummy) {
 }
 
 static void *http_write_threadproc(void *dummy) {
+	printf("http_write_threadproc start\n");
 	while (1) {
 		struct gateway_op *message = message_queue_read(&worker_queue);
 		if ( message->operation == OP_WRITE_HTTP ) { 
+			printf("message->operation == OP_WRITE_HTTP\n");
 			http_write( message->message_txt );
 			message_queue_message_free(&worker_queue, message);
 		} else if ( message->operation == OP_EXIT ) {
@@ -107,19 +102,33 @@ static void *socket_read_threadproc(void *dummy) {
 	int state = 0;
 	struct sockaddr_in clientaddr;
 	int client_len = sizeof(clientaddr);
+	int max_fd, r;
+	struct timeval tv;
+	fd_set readfds, wfds;
+
+	printf("socket_read_threadproc start\n");
 
 	server_sockfd = create_socket(PORT_NUM);
+	printf("server_sockfd %d\n", server_sockfd);
 	if (server_sockfd >= 0) {
+		printf("create_socket ok \n");
 		while (1) {
-			int max_fd, r;
-			fd_set readfds, wfds;
 			FD_ZERO(&readfds);
-			r = select(max_fd + 1, &readfds, &wfds, NULL, NULL );
+			if (server_sockfd) FD_SET(server_sockfd, &readfds);
+			// uart fd도 구해서 max fd 를 맨드러야 할듯?
+			max_fd = server_sockfd;
+			max_fd = mk_fds(&readfds, max_fd);
+			tv.tv_sec = 0;
+			tv.tv_usec = 500000;
+
+//printf("max_fd %d, readfds %d\n", max_fd, readfds);
+			r = select(max_fd + 1, &readfds, (fd_set *)0, (fd_set *)0, NULL );
 			if (r >= 0) {
+				//printf("socket select ok\n");
 				if (FD_ISSET(server_sockfd, &readfds)) {
-
+					printf("readfs ok\n");
 					client_sockfd = accept(server_sockfd, (struct sockaddr *)&clientaddr, &client_len);
-
+					printf("accept\n");
 					if (client_sockfd < 0 ) {
 						printf("Failed to accept the connection request from App Framework!\n");
 					} else {
@@ -137,7 +146,6 @@ static void *socket_read_threadproc(void *dummy) {
 	}
 	return NULL;
 }
-
 
 static void threads_init() {
 	message_queue_init(&worker_queue, sizeof(struct gateway_op), 512);
@@ -165,7 +173,6 @@ static void wake_main_thread() {
 	}
 }
 
-
 // MARK: uart data processing
 struct socket_state {
 	enum { SOCKET_INACTIVE, SOCKET_READING, SOCKET_WRITING } state;
@@ -180,6 +187,7 @@ struct socket_state socket_data[FD_SETSIZE];
 static void handle_socket_data(int fd) {
 	int r;
 	if((r = read(fd, socket_data[fd].buf+socket_data[fd].pos, 1024-socket_data[fd].pos)) > 0) {
+		printf("handle_socket_data %s\n",socket_data[fd].buf);
 		socket_data[fd].pos += r;
 		if(socket_data[fd].pos >= 4 ) {
 			socket_data[fd].buf[socket_data[fd].pos] = '\0';
@@ -197,12 +205,12 @@ static void handle_socket_data(int fd) {
 static void handle_socket_request(int fd, char *request) {
 	//ack
 	write(fd,"ack",3);
-
+	printf("handle_socket_request ack!\n");
 	if(!strncmp(request, "HELLO", 5)) {
 		struct gateway_op *message = message_queue_message_alloc_blocking(&worker_queue);
 		message->operation = OP_WRITE_HTTP;
 		message->message_txt = "HELLO";
-		//message->fd = fd;
+		message->fd = fd;
 		message_queue_write(&worker_queue, message);
 		close(fd);
 	} else {
@@ -268,7 +276,6 @@ static void handle_uart_request(int fd, char *request) {
 			} else {
 				check_uart(request);
 			}
-			
 		}
 
 		// UART cmd ? HTTP cmd ?
@@ -295,7 +302,6 @@ static void handle_uart_request(int fd, char *request) {
 	} else {
 		return;
 	}
-
 }
 
 static void uart_write(int fd, const char *msg) {
@@ -306,14 +312,6 @@ static void http_write(const char *msg) {
 	int r = ssl_write( msg, strlen(msg) );
 }
 
-// static void service_io_message_queue() {
-// 	struct io_op *message;
-// 	while(message = message_queue_tryread(&io_queue)) {
-// 		uart_data[message->fd].state = UART_WRITING;
-// 		uart_data[message->fd].write_op = message;
-// 	}
-// }
-
 static void handle_signal(int signal) {
 }
 
@@ -321,8 +319,6 @@ int main(int argc, char *argv[]) {
 	main_thread = pthread_self();
 	signal(SIGUSR1, &handle_signal);
 	signal(SIGPIPE, SIG_IGN);
-	message_queue_init(&io_queue, sizeof(struct io_op), 128);
-	
 	threads_init();
 
 	if (init_wiringPi() == -1) {
@@ -338,7 +334,6 @@ int main(int argc, char *argv[]) {
 			int max_fd, r;
 			main_blocked = 1;
 			__sync_synchronize();
-			// service_io_message_queue(); //main thread io_message queue
 			FD_ZERO(&rfds);
 			FD_ZERO(&wfds);
 			max_fd = 0;
@@ -372,11 +367,8 @@ int main(int argc, char *argv[]) {
 						handle_uart_data(fd);
 				}
 			}
-			// service_io_message_queue();
 		}
 	} else {
 		perror("Error listening on uart ");
 	}
 }
-
-

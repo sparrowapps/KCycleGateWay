@@ -237,12 +237,12 @@ static void hex_print(const void* pv, size_t len)
 
 
 // ============================================================================
-//	openssl ÀÇ ase ¾Ë°í¸®Áò test¸¦ À§ÇØ ÀÛ¼ºÇÑ ÇÔ¼ö
-//	¾Æ·¡¿¡ ÀÛ¼ºµÈ °ÍÃ³·³ ´ÙÀ½°ú °°Àº ¼ø¼­¸¦ µû¸§
-//	1. ±¸Á¶Ã¼ ¼±¾ð SSL_OPEN_TO_SERVER
-//	2. SSLOpenToServer() ÇÔ¼ö È£Ãâ
+//	openssl ï¿½ï¿½ ase ï¿½Ë°ï¿½ï¿½ï¿½ testï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Û¼ï¿½ï¿½ï¿½ ï¿½Ô¼ï¿½
+//	ï¿½Æ·ï¿½ï¿½ï¿½ ï¿½Û¼ï¿½ï¿½ï¿½ ï¿½ï¿½Ã³ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+//	1. ï¿½ï¿½ï¿½ï¿½Ã¼ ï¿½ï¿½ï¿½ï¿½ SSL_OPEN_TO_SERVER
+//	2. SSLOpenToServer() ï¿½Ô¼ï¿½ È£ï¿½ï¿½
 //	3. ssl read, write
-//	4. SSLCloseToServer() ÇÔ¼ö È£Ãâ
+//	4. SSLCloseToServer() ï¿½Ô¼ï¿½ È£ï¿½ï¿½
 // ============================================================================
 int ssl_test()
 {
@@ -287,7 +287,7 @@ int ssl_write(unsigned char * msg, int size) {
 	int bytes;
 
 	SSL_OPEN_TO_SERVER sslOpenToServer;
-
+	printf("ssl write \n");
 	if (SSLOpenToServer(&sslOpenToServer, "192.168.137.1", "8443") != SSL_OPEN_TO_SERVER_SUCCESS)
 	{
 		puts("SSLOpenToServer fail\n");

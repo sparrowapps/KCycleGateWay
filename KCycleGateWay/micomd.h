@@ -9,7 +9,7 @@ typedef unsigned long int      DWORD;
 typedef signed long int        INT32;
 
 #define SOCK_IP_ADDR           "127.0.0.1"
-#define PORT_NUM               4000
+#define PORT_NUM               8443
 
 /* fd index */
 #define UART                   1
