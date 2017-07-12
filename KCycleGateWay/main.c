@@ -54,12 +54,12 @@ struct gateway_op {
 };
 
 // 메인 스레드 <--- 입출력 컨텍스트
-struct io_op {
-	char buf[1024]; //
-	int len, pos; //
-	int fd, rfd;
-	int close_pending;
-};
+// struct io_op {
+// 	char buf[1024]; //
+// 	int len, pos; //
+// 	int fd, rfd;
+// 	int close_pending;
+// };
 
 static struct message_queue worker_queue;
 static struct message_queue io_queue;
@@ -171,7 +171,7 @@ struct socket_state {
 	enum { SOCKET_INACTIVE, SOCKET_READING, SOCKET_WRITING } state;
 	char buf[1024];
 	int pos;
-	struct io_op *write_op;
+	// struct io_op *write_op;
 };
 
 struct socket_state socket_data[FD_SETSIZE];
@@ -215,7 +215,7 @@ struct uart_state {
 	enum { UART_INACTIVE, UART_READING, UART_WRITING } state;
 	char buf[1024];
 	int pos;
-	struct io_op *write_op;
+	// struct io_op *write_op;
 };
 
 struct uart_state uart_data[FD_SETSIZE];
