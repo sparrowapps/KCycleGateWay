@@ -50,7 +50,7 @@ static void http_write(const char *msg);
 struct gateway_op {
 	enum { OP_WRITE_UART, OP_WRITE_HTTP, OP_EXIT } operation;
 	const char *message_txt; //
-	int rfd, fd;
+	//int rfd, fd;
 };
 
 // 메인 스레드 <--- 입출력 컨텍스트
@@ -61,7 +61,7 @@ struct gateway_op {
 // 	int close_pending;
 // };
 
-static struct message_queue worker_queue;
+static str uct message_queue worker_queue;
 static struct message_queue io_queue;
 
 static pthread_t main_thread; //serial read
@@ -202,7 +202,7 @@ static void handle_socket_request(int fd, char *request) {
 		struct gateway_op *message = message_queue_message_alloc_blocking(&worker_queue);
 		message->operation = OP_WRITE_HTTP;
 		message->message_txt = "HELLO";
-		message->fd = fd;
+		//message->fd = fd;
 		message_queue_write(&worker_queue, message);
 		close(fd);
 	} else {
@@ -306,13 +306,13 @@ static void http_write(const char *msg) {
 	int r = ssl_write( msg, strlen(msg) );
 }
 
-static void service_io_message_queue() {
-	struct io_op *message;
-	while(message = message_queue_tryread(&io_queue)) {
-		uart_data[message->fd].state = UART_WRITING;
-		uart_data[message->fd].write_op = message;
-	}
-}
+// static void service_io_message_queue() {
+// 	struct io_op *message;
+// 	while(message = message_queue_tryread(&io_queue)) {
+// 		uart_data[message->fd].state = UART_WRITING;
+// 		uart_data[message->fd].write_op = message;
+// 	}
+// }
 
 static void handle_signal(int signal) {
 }
@@ -338,7 +338,7 @@ int main(int argc, char *argv[]) {
 			int max_fd, r;
 			main_blocked = 1;
 			__sync_synchronize();
-			service_io_message_queue(); //main thread io_message queue
+			// service_io_message_queue(); //main thread io_message queue
 			FD_ZERO(&rfds);
 			FD_ZERO(&wfds);
 			max_fd = 0;
@@ -372,7 +372,7 @@ int main(int argc, char *argv[]) {
 						handle_uart_data(fd);
 				}
 			}
-			service_io_message_queue();
+			// service_io_message_queue();
 		}
 	} else {
 		perror("Error listening on uart ");
