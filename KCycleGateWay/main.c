@@ -48,7 +48,7 @@ static void http_write(const char *msg);
 
 // 메인 스레드 <---> 스레드 풀( 시리얼 write, http write 명령 컨텍스트)
 struct gateway_op {
-	enum { OP_WRITE_UART, OP_WRITE_HTTP, OP_EXIT } operation;
+	enum { OP_WRITE_UART, OP_WRITE_HTTP, OP_READ_SOCKET, OP_READ_UART, OP_EXIT } operation;
 	const char *message_txt; //
 	int fd;
 };
@@ -98,50 +98,32 @@ static void *http_write_threadproc(void *dummy) {
 
 extern int cnt_fd_socket;
 static void *socket_read_threadproc(void *dummy) {
-	int server_sockfd, client_sockfd = 0;
-	int state = 0;
-	struct sockaddr_in clientaddr;
-	int client_len = sizeof(clientaddr);
-	int max_fd, r;
-	struct timeval tv;
-	fd_set readfds, wfds;
-
 	printf("socket_read_threadproc start\n");
+	while (1)  {
+		struct gateway_op *message = message_queue_read(&worker_queue);
+		if (message->operation == OP_READ_SOCKET ) {
+			printf("OP_READ_SOCKET\n");
+			handle_socket_data(message->fd);
+			message_queue_message_free(&worker_queue, message);
+		} else if ( message->operation == OP_EXIT ) {
+			message_queue_message_free(&worker_queue, message);
+			return NULL;
+		}
+	}
+	return NULL;
+}
 
-	server_sockfd = create_socket(PORT_NUM);
-	printf("server_sockfd %d\n", server_sockfd);
-	if (server_sockfd >= 0) {
-		printf("create_socket ok \n");
-		while (1) {
-			FD_ZERO(&readfds);
-			if (server_sockfd) FD_SET(server_sockfd, &readfds);
-			// uart fd도 구해서 max fd 를 맨드러야 할듯?
-			max_fd = server_sockfd;
-			max_fd = mk_fds(&readfds, max_fd);
-			tv.tv_sec = 0;
-			tv.tv_usec = 500000;
-
-//printf("max_fd %d, readfds %d\n", max_fd, readfds);
-			r = select(max_fd + 1, &readfds, (fd_set *)0, (fd_set *)0, NULL );
-			if (r >= 0) {
-				//printf("socket select ok\n");
-				if (FD_ISSET(server_sockfd, &readfds)) {
-					printf("readfs ok\n");
-					client_sockfd = accept(server_sockfd, (struct sockaddr *)&clientaddr, &client_len);
-					printf("accept\n");
-					if (client_sockfd < 0 ) {
-						printf("Failed to accept the connection request from App Framework!\n");
-					} else {
-						if (add_socket(client_sockfd) == -1) {
-							printf("Failed to add socket because of the number of socket(%d) !! \n", cnt_fd_socket);
-						} else {
-							//client_fd = client_sockfd;
-							printf("App Framework socket connected[fd = %d, cnt_fd = %d]!!!\n", client_sockfd, cnt_fd_socket);
-							handle_socket_data(client_sockfd); // socket 수신 처리
-						}
-					}
-				}
-			}
+static void *uart_read_threadproc(void *dummy) {
+	printf("uart_read_threadproc start\n");
+	while(1) {
+		struct gateway_op *message = message_queue_read(&worker_queue);
+		if (message->operation == OP_READ_UART ) {
+			printf("OP_READ_SOCKET\n");
+			handle_uart_data(message->fd);
+			message_queue_message_free(&worker_queue, message);
+		} else if ( message->operation == OP_EXIT ) {
+			message_queue_message_free(&worker_queue, message);
+			return NULL;
 		}
 	}
 	return NULL;
@@ -210,7 +192,6 @@ static void handle_socket_request(int fd, char *request) {
 		struct gateway_op *message = message_queue_message_alloc_blocking(&worker_queue);
 		message->operation = OP_WRITE_HTTP;
 		message->message_txt = "HELLO";
-		message->fd = fd;
 		message_queue_write(&worker_queue, message);
 		close(fd);
 	} else {
@@ -264,6 +245,7 @@ static void handle_uart_data(int fd) {
 extern int list_end;
 extern int cmd_state;
 extern int data_status;
+extern fd_masks[MAX_SOCKET_FD];
 static void handle_uart_request(int fd, char *request) {
 	// parse and cmd process
 	int uart_cnt = 0;
@@ -315,43 +297,61 @@ static void http_write(const char *msg) {
 static void handle_signal(int signal) {
 }
 
+
+// main fd select
 int main(int argc, char *argv[]) {
 	main_thread = pthread_self();
 	signal(SIGUSR1, &handle_signal);
 	signal(SIGPIPE, SIG_IGN);
 	threads_init();
 
-	if (init_wiringPi() == -1) {
-		printf("wirig pi failed\n");
-		return -1;
-	}
+	// if (init_wiringPi() == -1) {
+	// 	printf("wirig pi failed\n");
+	// 	return -1;
+	// }
 
-	int fd = open_uart();
+	int uart_fd = 0;
+	int server_sockfd, client_sockfd = 0; 
+	int client_len;
 
-	if (fd >=0 ) {
+	fd_set readfds, wfds;
+	int max_fd, r;
+	struct sockaddr_in clientaddr;
+
+	uart_fd =  open_uart();
+	server_sockfd = create_socket(PORT_NUM);
+
+	if (server_sockfd >=0 && uart_fd >= 0 ) {
 		while(1) {
-			fd_set rfds, wfds;
-			int max_fd, r;
+			
 			main_blocked = 1;
+
 			__sync_synchronize();
-			FD_ZERO(&rfds);
+
+			FD_ZERO(&readfds);
 			FD_ZERO(&wfds);
-			max_fd = 0;
-			FD_SET(fd, &rfds);
 
-			for (int i = 0; i<FD_SETSIZE; ++i) {
-				if (uart_data[i].state == UART_READING) {
-					FD_SET(i, &rfds);
-					max_fd = i;
-				}
-				else if (uart_data[i].state == UART_WRITING) {
-					FD_SET(i, &wfds);
-					max_fd = i;
-				}
-			}
+			if (server_sockfd) FD_SET(server_sockfd, &readfds);
+			if (uart_fd) FD_SET(uart_fd, &readfds);
 
-			max_fd = fd > max_fd ? fd : max_fd;
-			r = select(max_fd + 1, &rfds, &wfds, NULL, NULL);
+			max_fd = get_max_fd(server_sockfd, uart_fd, 0);
+			max_fd = mk_fds(&readfds, max_fd);
+			max_fd = 5;
+
+			// for (int i = 0; i<FD_SETSIZE; ++i) {
+			// 	if (uart_data[i].state == UART_READING) {
+			// 		FD_SET(i, &rfds);
+			// 		max_fd = i;
+			// 	}
+			// 	else if (uart_data[i].state == UART_WRITING) {
+			// 		FD_SET(i, &wfds);
+			// 		max_fd = i;
+			// 	}
+			// }
+
+			// max_fd = fd > max_fd ? fd : max_fd;
+			
+			r = select(max_fd + 1, &readfds, (fd_set *)0, NULL, NULL);
 			main_blocked = 0;
 			__sync_synchronize();
 
@@ -359,16 +359,58 @@ int main(int argc, char *argv[]) {
 				perror("Error in select");
 				return -1;
 			}
-			if (r > 0) {
-				if (FD_ISSET(fd, &rfds)) {
-						uart_data[fd].state = UART_READING;
-						uart_data[fd].pos = 0;
+			if (r >= 0) {
+				
+				if (FD_ISSET(uart_fd, &readfds)) {
+					printf("UART server_sockfd %d, uart_fd %d, max_fd %d\n", server_sockfd, uart_fd, max_fd);
+					uart_data[uart_fd].state = UART_READING;
+					uart_data[uart_fd].pos = 0;
+					
+					struct gateway_op *message = message_queue_message_alloc_blocking(&worker_queue);
+					message->operation = OP_READ_UART;
+					message_queue_write(&worker_queue, message);
+				}
 
-						handle_uart_data(fd);
+				if (FD_ISSET(server_sockfd, &readfds)) {
+					printf("SOCKET server_sockfd %d, uart_fd %d, max_fd %d\n", server_sockfd, uart_fd, max_fd);
+					client_sockfd = accept(server_sockfd, (struct sockaddr *)&clientaddr, &client_len);
+					if (client_sockfd < 0) {
+						printf("Failed to accept the connection request from App Framework!\n");
+					} else {
+						
+						if(add_socket(client_sockfd) == -1) {
+							printf("Failed to add socket because of the number of socket(%d) !! \n", cnt_fd_socket);
+						} else {
+							//client_fd = client_sockfd;
+							printf("App Framework socket connected[fd = %d, cnt_fd = %d]!!!\n", client_sockfd, cnt_fd_socket);
+
+							socket_data[server_sockfd].state = SOCKET_READING;
+							socket_data[server_sockfd].pos = 0;
+							
+							struct gateway_op *message = message_queue_message_alloc_blocking(&worker_queue);
+							message->operation = OP_READ_SOCKET;
+							message_queue_write(&worker_queue, message);
+
+						}
+					}
+
 				}
 			}
 		}
+
+		for(int i=0; i < cnt_fd_socket; i++)
+		{
+			del_socket(fd_masks[i]);
+		}
+
+		close(server_sockfd);
+		uart_close(uart_fd);
+
+		printf("End of GateWay Daemon!\n");
+
+		return 0;
+
 	} else {
-		perror("Error listening on uart ");
+		perror("Error listening on uart or socket");
 	}
 }
