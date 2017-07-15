@@ -57,7 +57,8 @@ struct gateway_op {
 static struct message_queue worker_queue;
 
 static pthread_t main_thread; //serial read
-static pthread_t socket_read_thread; //소켓 수신대기 스레드 
+static pthread_t socket_read_thread;
+static pthread_t uart_read_thread; 
 static pthread_t uart_write_thread;
 static pthread_t http_write_thread;
 
@@ -102,7 +103,7 @@ static void *socket_read_threadproc(void *dummy) {
 	while (1)  {
 		struct gateway_op *message = message_queue_read(&worker_queue);
 		if (message->operation == OP_READ_SOCKET ) {
-			printf("OP_READ_SOCKET\n");
+			printf("OP_READ_SOCKETsssss\n");
 			handle_socket_data(message->fd);
 			message_queue_message_free(&worker_queue, message);
 		} else if ( message->operation == OP_EXIT ) {
@@ -118,7 +119,7 @@ static void *uart_read_threadproc(void *dummy) {
 	while(1) {
 		struct gateway_op *message = message_queue_read(&worker_queue);
 		if (message->operation == OP_READ_UART ) {
-			printf("OP_READ_SOCKET\n");
+			printf("OP_READ_UART\n");
 			handle_uart_data(message->fd);
 			message_queue_message_free(&worker_queue, message);
 		} else if ( message->operation == OP_EXIT ) {
@@ -132,9 +133,10 @@ static void *uart_read_threadproc(void *dummy) {
 static void threads_init() {
 	message_queue_init(&worker_queue, sizeof(struct gateway_op), 512);
 	
-	pthread_create(&uart_write_thread, NULL, &uart_write_threadproc, NULL);
-	pthread_create(&http_write_thread, NULL, &http_write_threadproc, NULL);
+	//pthread_create(&uart_write_thread, NULL, &uart_write_threadproc, NULL);
+	//pthread_create(&http_write_thread, NULL, &http_write_threadproc, NULL);
 	pthread_create(&socket_read_thread, NULL, &socket_read_threadproc, NULL);
+	//pthread_create(&uart_read_thread, NULL, &uart_read_threadproc, NULL);
 }
 
 static void threads_destroy() {
@@ -168,6 +170,10 @@ struct socket_state socket_data[FD_SETSIZE];
 // socket read
 static void handle_socket_data(int fd) {
 	int r;
+
+	printf("handle_socket_data fd %d ", fd);
+
+
 	if((r = read(fd, socket_data[fd].buf+socket_data[fd].pos, 1024-socket_data[fd].pos)) > 0) {
 		printf("handle_socket_data %s\n",socket_data[fd].buf);
 		socket_data[fd].pos += r;
@@ -384,11 +390,13 @@ int main(int argc, char *argv[]) {
 							//client_fd = client_sockfd;
 							printf("App Framework socket connected[fd = %d, cnt_fd = %d]!!!\n", client_sockfd, cnt_fd_socket);
 
-							socket_data[server_sockfd].state = SOCKET_READING;
-							socket_data[server_sockfd].pos = 0;
+							socket_data[client_sockfd].state = SOCKET_READING;
+							socket_data[client_sockfd].pos = 0;
 							
 							struct gateway_op *message = message_queue_message_alloc_blocking(&worker_queue);
+							printf("message queue write OP_READ_SOCKET\n");
 							message->operation = OP_READ_SOCKET;
+							message->fd = client_sockfd;
 							message_queue_write(&worker_queue, message);
 
 						}
