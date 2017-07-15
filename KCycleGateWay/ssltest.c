@@ -4,9 +4,9 @@
  Author      : pjh
  Version     : 1.0
  Date        : 2017.05.18
- Copyright   : ¸· ¾²¼¼¿ä~
- Description : openssl api¸¦ »ç¿ëÇÑ ssl test
- 	 	 	 	 springboot¸¦ »ç¿ëÇÑ tomcat°ú testµÇ¾úÀ½
+ Copyright   : ë§‰ ì“°ì„¸ìš”~
+ Description : openssl apië¥¼ ì‚¬ìš©í•œ ssl test
+ 	 	 	 	 springbootë¥¼ ì‚¬ìš©í•œ tomcatê³¼ testë˜ì—ˆìŒ
  ============================================================================
  */
 
@@ -22,13 +22,13 @@ int SSLOpenToServer(SSL_OPEN_TO_SERVER *sslOpenToServer, char *hostName, char *p
 	// SSL library init
     SSL_library_init();
 
-	// crypto¿¡¼­ ¸ðµç algrithmÀ» load
+	// cryptoì—ì„œ ëª¨ë“  algrithmì„ load
 	OpenSSL_add_all_algorithms();
 
-	// error message¸¦ load
+	// error messageë¥¼ load
 	SSL_load_error_strings();
 
-	// TLS1(=SSL3)¸¦ »ç¿ëÇÑ´Ù°í ¼³Á¤
+	// TLS1(=SSL3)ë¥¼ ì‚¬ìš©í•œë‹¤ê³  ì„¤ì •
 	method = TLSv1_2_client_method();
 
 	// create SSL context
@@ -78,7 +78,7 @@ int SSLOpenToServer(SSL_OPEN_TO_SERVER *sslOpenToServer, char *hostName, char *p
 		return SSL_OPEN_TO_SERVER_FAIL_TO_NEW_SSL;
     }
 
-    // SSL¿¡¼­ »ç¿ëÇÒ socket Á¤º¸ Àü´Þ
+    // SSLì—ì„œ ì‚¬ìš©í•  socket ì •ë³´ ì „ë‹¬
     SSL_set_fd(sslOpenToServer->ssl, sslOpenToServer->socketDescriptor);    /* attach the socket descriptor */
 
     // SSL handshake

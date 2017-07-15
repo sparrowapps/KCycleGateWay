@@ -288,7 +288,7 @@ int ssl_write(unsigned char * msg, int size) {
 
 	SSL_OPEN_TO_SERVER sslOpenToServer;
 	printf("ssl write \n");
-	if (SSLOpenToServer(&sslOpenToServer, "192.168.137.1", "8443") != SSL_OPEN_TO_SERVER_SUCCESS)
+	if (SSLOpenToServer(&sslOpenToServer, HTTPS_IP_ADDR, HTTPS_PORT_NUM) != SSL_OPEN_TO_SERVER_SUCCESS)
 	{
 		puts("SSLOpenToServer fail\n");
 		return -1;

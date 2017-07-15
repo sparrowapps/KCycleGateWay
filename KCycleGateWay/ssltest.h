@@ -4,9 +4,9 @@
  Author      : pjh
  Version     : 1.0
  Date        : 2017.05.18
- Copyright   : ¸· ¾²¼¼¿ä~
- Description : openssl api¸¦ »ç¿ëÇÑ ssl test
- 	 	 	 	 springboot¸¦ »ç¿ëÇÑ tomcat°ú testµÇ¾úÀ½
+ Copyright   : ë§‰ ì“°ì„¸ìš”~
+ Description : openssl apië¥¼ ì‚¬ìš©í•œ ssl test
+ 	 	 	 	 springbootë¥¼ ì‚¬ìš©í•œ tomcatê³¼ testë˜ì—ˆìŒ
  ============================================================================
  */
 

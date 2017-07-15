@@ -46,15 +46,18 @@ static void http_write(const char *msg);
 
 // Message queue related code
 
-// 메인 스레드 <---> 스레드 풀( 시리얼 write, http write 명령 컨텍스트)
 struct gateway_op {
 	enum { OP_WRITE_UART, OP_WRITE_HTTP, OP_READ_SOCKET, OP_READ_UART, OP_EXIT } operation;
 	const char *message_txt; //
 	int fd;
+	int server_fd;
 };
 
 
-static struct message_queue worker_queue;
+static struct message_queue uart_w_queue;
+static struct message_queue uart_r_queue;
+static struct message_queue https_queue;
+static struct message_queue socket_queue;
 
 static pthread_t main_thread; //serial read
 static pthread_t socket_read_thread;
@@ -67,13 +70,13 @@ static int main_blocked;
 static void *uart_write_threadproc(void *dummy) {
 	printf("uart_write_threadproc start\n");
 	while (1) {
-		struct gateway_op *message = message_queue_read(&worker_queue);
+		struct gateway_op *message = message_queue_read(&uart_w_queue);
 
 		if ( message->operation == OP_WRITE_HTTP ) {
 			uart_write( message->fd, message->message_txt );
-			message_queue_message_free(&worker_queue, message);
+			message_queue_message_free(&uart_w_queue, message);
 		} else if ( message->operation == OP_EXIT ) {
-			message_queue_message_free(&worker_queue, message);
+			message_queue_message_free(&uart_w_queue, message);
 			return NULL;
 		}
 		
@@ -84,13 +87,13 @@ static void *uart_write_threadproc(void *dummy) {
 static void *http_write_threadproc(void *dummy) {
 	printf("http_write_threadproc start\n");
 	while (1) {
-		struct gateway_op *message = message_queue_read(&worker_queue);
+		struct gateway_op *message = message_queue_read(&https_queue);
 		if ( message->operation == OP_WRITE_HTTP ) { 
 			printf("message->operation == OP_WRITE_HTTP\n");
 			http_write( message->message_txt );
-			message_queue_message_free(&worker_queue, message);
+			message_queue_message_free(&https_queue, message);
 		} else if ( message->operation == OP_EXIT ) {
-			message_queue_message_free(&worker_queue, message);
+			message_queue_message_free(&https_queue, message);
 			return NULL;
 		}
 	}
@@ -101,13 +104,13 @@ extern int cnt_fd_socket;
 static void *socket_read_threadproc(void *dummy) {
 	printf("socket_read_threadproc start\n");
 	while (1)  {
-		struct gateway_op *message = message_queue_read(&worker_queue);
+		struct gateway_op *message = message_queue_read(&socket_queue);
 		if (message->operation == OP_READ_SOCKET ) {
-			printf("OP_READ_SOCKETsssss\n");
+			printf("OP_READ_SOCKET\n");
 			handle_socket_data(message->fd);
-			message_queue_message_free(&worker_queue, message);
+			message_queue_message_free(&socket_queue, message);
 		} else if ( message->operation == OP_EXIT ) {
-			message_queue_message_free(&worker_queue, message);
+			message_queue_message_free(&socket_queue, message);
 			return NULL;
 		}
 	}
@@ -117,13 +120,13 @@ static void *socket_read_threadproc(void *dummy) {
 static void *uart_read_threadproc(void *dummy) {
 	printf("uart_read_threadproc start\n");
 	while(1) {
-		struct gateway_op *message = message_queue_read(&worker_queue);
+		struct gateway_op *message = message_queue_read(&uart_r_queue);
 		if (message->operation == OP_READ_UART ) {
 			printf("OP_READ_UART\n");
 			handle_uart_data(message->fd);
-			message_queue_message_free(&worker_queue, message);
+			message_queue_message_free(&uart_r_queue, message);
 		} else if ( message->operation == OP_EXIT ) {
-			message_queue_message_free(&worker_queue, message);
+			message_queue_message_free(&uart_r_queue, message);
 			return NULL;
 		}
 	}
@@ -131,24 +134,45 @@ static void *uart_read_threadproc(void *dummy) {
 }
 
 static void threads_init() {
-	message_queue_init(&worker_queue, sizeof(struct gateway_op), 512);
+	message_queue_init(&uart_r_queue, sizeof(struct gateway_op), 512);
+	message_queue_init(&uart_w_queue, sizeof(struct gateway_op), 512);
+	message_queue_init(&https_queue, sizeof(struct gateway_op), 512);
+	message_queue_init(&socket_queue, sizeof(struct gateway_op), 512);
 	
-	//pthread_create(&uart_write_thread, NULL, &uart_write_threadproc, NULL);
-	//pthread_create(&http_write_thread, NULL, &http_write_threadproc, NULL);
+	pthread_create(&uart_write_thread, NULL, &uart_write_threadproc, NULL);
+	pthread_create(&uart_read_thread, NULL, &uart_read_threadproc, NULL);
+	pthread_create(&http_write_thread, NULL, &http_write_threadproc, NULL);
 	pthread_create(&socket_read_thread, NULL, &socket_read_threadproc, NULL);
-	//pthread_create(&uart_read_thread, NULL, &uart_read_threadproc, NULL);
+	
 }
 
 static void threads_destroy() {
-	struct gateway_op *poison = message_queue_message_alloc_blocking(&worker_queue);
-	poison->operation = OP_EXIT;
-	message_queue_write(&worker_queue, poison);
-	
+	struct gateway_op *posion_uart_r = message_queue_message_alloc_blocking(&uart_r_queue);
+	posion_uart_r->operation = OP_EXIT;
+	message_queue_write(&uart_r_queue, posion_uart_r);
+
+	struct gateway_op *poison_uart_w = message_queue_message_alloc_blocking(&uart_w_queue);
+	poison_uart_w->operation = OP_EXIT;
+	message_queue_write(&uart_w_queue, poison_uart_w);
+
+	struct gateway_op *poison_https = message_queue_message_alloc_blocking(&https_queue);
+	poison_https->operation = OP_EXIT;
+	message_queue_write(&https_queue, poison_https);
+
+	struct gateway_op *poison_socket = message_queue_message_alloc_blocking(&socket_queue);
+	poison_socket->operation = OP_EXIT;
+	message_queue_write(&socket_queue, poison_socket);
+
+
 	pthread_join(uart_write_thread, NULL);
+	pthread_join(uart_read_thread, NULL);
 	pthread_join(http_write_thread, NULL);
 	pthread_join(socket_read_thread, NULL);
 
-	message_queue_destroy(&worker_queue);
+	message_queue_destroy(&uart_r_queue);
+	message_queue_destroy(&uart_w_queue);
+	message_queue_destroy(&https_queue);
+	message_queue_destroy(&socket_queue);
 }
 
 static void wake_main_thread() {
@@ -195,13 +219,25 @@ static void handle_socket_request(int fd, char *request) {
 	write(fd,"ack",3);
 	printf("handle_socket_request ack!\n");
 	if(!strncmp(request, "HELLO", 5)) {
-		struct gateway_op *message = message_queue_message_alloc_blocking(&worker_queue);
+		struct gateway_op *message = message_queue_message_alloc_blocking(&https_queue);
 		message->operation = OP_WRITE_HTTP;
-		message->message_txt = "HELLO";
-		message_queue_write(&worker_queue, message);
+		message->message_txt = "GET /gateway/hello HTTP/1.1\n\
+Host: 115.136.138.81:4432\n\
+Connection: keep-alive\n\
+Cache-Control: max-age=0\n\
+Upgrade-Insecure-Requests: 1\n\
+User-Agent: Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36\n\
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8\n\
+Accept-Encoding: gzip, deflate, sdch, br\n\
+Accept-Language: ko-KR,ko;q=0.8,en-US;q=0.6,en;q=0.4\n\
+Cookie: JSESSIONID=5EBE4E35EBC10452C92EC291149B798F\n\
+";
+		message_queue_write(&https_queue, message);
 		close(fd);
+		del_socket(fd);
 	} else {
 		close(fd);
+		del_socket(fd);
 	}
 }
 
@@ -210,7 +246,6 @@ struct uart_state {
 	enum { UART_INACTIVE, UART_READING, UART_WRITING } state;
 	char buf[1024];
 	int pos;
-	// struct io_op *write_op;
 };
 
 struct uart_state uart_data[FD_SETSIZE];
@@ -270,19 +305,19 @@ static void handle_uart_request(int fd, char *request) {
 		if(!strncmp(request, "UART", 4)) {
 			char *msg_txt = request+4;
 
-			struct gateway_op *message = message_queue_message_alloc_blocking(&worker_queue);
+			struct gateway_op *message = message_queue_message_alloc_blocking(&uart_w_queue);
 			message->operation = OP_WRITE_UART;
 			message->message_txt = msg_txt;
 			message->fd = fd;
-			message_queue_write(&worker_queue, message);
+			message_queue_write(&uart_w_queue, message);
 		} else if (!strncmp(request, "HTTP", 4)) {
 			char *msg_txt = request+4;
 
-			struct gateway_op *message = message_queue_message_alloc_blocking(&worker_queue);
+			struct gateway_op *message = message_queue_message_alloc_blocking(&https_queue);
 			message->operation = OP_WRITE_HTTP;
 			message->message_txt = msg_txt;
 			message->fd = fd;
-			message_queue_write(&worker_queue, message);	
+			message_queue_write(&https_queue, message);	
 		} else {
 			close(fd);
 		}
@@ -300,21 +335,15 @@ static void http_write(const char *msg) {
 	int r = ssl_write( msg, strlen(msg) );
 }
 
-static void handle_signal(int signal) {
-}
-
-
 // main fd select
 int main(int argc, char *argv[]) {
 	main_thread = pthread_self();
-	signal(SIGUSR1, &handle_signal);
-	signal(SIGPIPE, SIG_IGN);
 	threads_init();
 
-	// if (init_wiringPi() == -1) {
-	// 	printf("wirig pi failed\n");
-	// 	return -1;
-	// }
+	if (init_wiringPi() == -1) {
+		printf("wirig pi failed\n");
+		return -1;
+	}
 
 	int uart_fd = 0;
 	int server_sockfd, client_sockfd = 0; 
@@ -324,42 +353,26 @@ int main(int argc, char *argv[]) {
 	int max_fd, r;
 	struct sockaddr_in clientaddr;
 
+	memset(fd_masks, -1, MAX_SOCKET_FD);
+
 	uart_fd =  open_uart();
 	server_sockfd = create_socket(PORT_NUM);
+	printf("uart fd %d\n",uart_fd);
+	printf("server_sockfd fd %d\n",server_sockfd);
+	max_fd = uart_fd > server_sockfd ? uart_fd : server_sockfd;
+	printf("maxfd %d\n",max_fd);
+	max_fd = mk_fds(&readfds, max_fd);
+	printf("maxfd %d\n",max_fd);
 
 	if (server_sockfd >=0 && uart_fd >= 0 ) {
 		while(1) {
-			
-			main_blocked = 1;
-
-			__sync_synchronize();
-
 			FD_ZERO(&readfds);
 			FD_ZERO(&wfds);
 
 			if (server_sockfd) FD_SET(server_sockfd, &readfds);
 			if (uart_fd) FD_SET(uart_fd, &readfds);
-
-			max_fd = get_max_fd(server_sockfd, uart_fd, 0);
-			max_fd = mk_fds(&readfds, max_fd);
-			max_fd = 5;
-
-			// for (int i = 0; i<FD_SETSIZE; ++i) {
-			// 	if (uart_data[i].state == UART_READING) {
-			// 		FD_SET(i, &rfds);
-			// 		max_fd = i;
-			// 	}
-			// 	else if (uart_data[i].state == UART_WRITING) {
-			// 		FD_SET(i, &wfds);
-			// 		max_fd = i;
-			// 	}
-			// }
-
-			// max_fd = fd > max_fd ? fd : max_fd;
 			
 			r = select(max_fd + 1, &readfds, (fd_set *)0, NULL, NULL);
-			main_blocked = 0;
-			__sync_synchronize();
 
 			if (r < 0 && errno != EINTR) {
 				perror("Error in select");
@@ -368,13 +381,14 @@ int main(int argc, char *argv[]) {
 			if (r >= 0) {
 				
 				if (FD_ISSET(uart_fd, &readfds)) {
-					printf("UART server_sockfd %d, uart_fd %d, max_fd %d\n", server_sockfd, uart_fd, max_fd);
+
 					uart_data[uart_fd].state = UART_READING;
 					uart_data[uart_fd].pos = 0;
 					
-					struct gateway_op *message = message_queue_message_alloc_blocking(&worker_queue);
+					struct gateway_op *message = message_queue_message_alloc_blocking(&uart_r_queue);
 					message->operation = OP_READ_UART;
-					message_queue_write(&worker_queue, message);
+					message->fd = uart_fd;
+					message_queue_write(&uart_r_queue, message);
 				}
 
 				if (FD_ISSET(server_sockfd, &readfds)) {
@@ -387,17 +401,17 @@ int main(int argc, char *argv[]) {
 						if(add_socket(client_sockfd) == -1) {
 							printf("Failed to add socket because of the number of socket(%d) !! \n", cnt_fd_socket);
 						} else {
-							//client_fd = client_sockfd;
 							printf("App Framework socket connected[fd = %d, cnt_fd = %d]!!!\n", client_sockfd, cnt_fd_socket);
 
 							socket_data[client_sockfd].state = SOCKET_READING;
 							socket_data[client_sockfd].pos = 0;
 							
-							struct gateway_op *message = message_queue_message_alloc_blocking(&worker_queue);
+							struct gateway_op *message = message_queue_message_alloc_blocking(&socket_queue);
 							printf("message queue write OP_READ_SOCKET\n");
 							message->operation = OP_READ_SOCKET;
 							message->fd = client_sockfd;
-							message_queue_write(&worker_queue, message);
+							
+							message_queue_write(&socket_queue, message);
 
 						}
 					}
@@ -422,3 +436,15 @@ int main(int argc, char *argv[]) {
 		perror("Error listening on uart or socket");
 	}
 }
+
+// message 전문
+// GET /gateway/hello HTTP/1.1
+// Host: 115.136.138.81:4432
+// Connection: keep-alive
+// Cache-Control: max-age=0
+// Upgrade-Insecure-Requests: 1
+// User-Agent: Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36
+// Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+// Accept-Encoding: gzip, deflate, sdch, br
+// Accept-Language: ko-KR,ko;q=0.8,en-US;q=0.6,en;q=0.4
+// Cookie: JSESSIONID=5EBE4E35EBC10452C92EC291149B798F

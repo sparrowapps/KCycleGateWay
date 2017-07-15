@@ -1,6 +1,7 @@
 {
     "files.associations": {
         "micomd.h": "c",
-        "wiringpi.h": "c"
+        "wiringpi.h": "c",
+        "unistd.h": "c"
     }
 }
