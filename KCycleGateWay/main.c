@@ -7,14 +7,6 @@ Date        : 2017.07.03
 Copyright   : 
 Description : 
 
-serial read thread
-socket listen thread 
-uart write thread
-http write thread
-
-serial read --> uart write thread
-serial read --> http write thread --> (http read) --> uart write thread
-socket read (ack) --> http write thread --> (http read) --> uart write thread
 ============================================================================
 
 */
@@ -50,9 +42,7 @@ struct gateway_op {
 	enum { OP_WRITE_UART, OP_WRITE_HTTP, OP_READ_SOCKET, OP_READ_UART, OP_EXIT } operation;
 	const char *message_txt; //
 	int fd;
-	int server_fd;
 };
-
 
 static struct message_queue uart_w_queue;
 static struct message_queue uart_r_queue;
@@ -64,8 +54,6 @@ static pthread_t socket_read_thread;
 static pthread_t uart_read_thread; 
 static pthread_t uart_write_thread;
 static pthread_t http_write_thread;
-
-static int main_blocked;
 
 static void *uart_write_threadproc(void *dummy) {
 	printf("uart_write_threadproc start\n");
@@ -175,12 +163,6 @@ static void threads_destroy() {
 	message_queue_destroy(&socket_queue);
 }
 
-static void wake_main_thread() {
-	if (__sync_lock_test_and_set(&main_blocked, 0)) {
-		pthread_kill(main_thread, SIGUSR1);
-	}
-}
-
 // MARK: uart data processing
 struct socket_state {
 	enum { SOCKET_INACTIVE, SOCKET_READING, SOCKET_WRITING } state;
@@ -254,33 +236,16 @@ struct uart_state uart_data[FD_SETSIZE];
 // read_packet() 함수를 사용 하지 않는다.
 static void handle_uart_data(int fd) {
 	int r;
-	if ((r = read(fd, uart_data[fd].buf + uart_data[fd].pos, 1024 - uart_data[fd].pos)) > 0) {
+	do {
+	r = read(fd, uart_data[fd].buf + uart_data[fd].pos, 1024 - uart_data[fd].pos);
 		uart_data[fd].pos += r;
-		
-		// 4글자의 시작 문자
-		//if (uart_data[fd].pos >= 4 && !strncmp(uart_data[fd].buf + uart_data[fd].pos - 4, "\r\n\r\n", 4)) {
+	}while( r == -1 );
+	
+	printf("uart read byte %d\n", uart_data[fd].pos);
+	uart_data[fd].state = UART_INACTIVE;
+	handle_uart_request(fd, uart_data[fd].buf);
 
-		//2글자의 시작 문자로 판단
-/*
-		if (uart_data[fd].pos >= 2 && 
-			((uart_data[fd].buf + uart_data[fd].pos - 2) == 0x0D) &&
-			((uart_data[fd].buf + uart_data[fd].pos - 1) == 0x0A)
-			) 
-		{
-			printf("uart request read\n");
-
-			uart_data[fd].buf[uart_data[fd].pos] = '\0';
-			uart_data[fd].state = UART_INACTIVE;
-			handle_uart_request(fd, uart_data[fd].buf);
-			return;
-		}
-*/
-		handle_uart_request(fd, uart_data[fd].buf);
-	}
-	else {
-		uart_data[fd].state = UART_INACTIVE;
-		close(fd);
-	}
+	
 }
 
 extern int list_end;
@@ -289,8 +254,10 @@ extern int data_status;
 extern fd_masks[MAX_SOCKET_FD];
 static void handle_uart_request(int fd, char *request) {
 	// parse and cmd process
+	printf("handle_uart_request : %s\n", request);
 	int uart_cnt = 0;
 	if (parse_data(request , &uart_cnt) == 1) {
+		printf("parse ok  %s uart_cnt %d\n", request,uart_cnt);
 
 		if (uart_cnt >0  || (cmd_state == 13 && list_end == 1) ) {
 			printf("handle_uart_request\n");
@@ -322,6 +289,7 @@ static void handle_uart_request(int fd, char *request) {
 			close(fd);
 		}
 
+		uart_data[fd].pos = 0;
 	} else {
 		return;
 	}
@@ -335,10 +303,18 @@ static void http_write(const char *msg) {
 	int r = ssl_write( msg, strlen(msg) );
 }
 
+void init_uart_data() {
+	for (int i = 0; i < FD_SETSIZE; i++) {
+		uart_data[i].state = UART_INACTIVE;
+	}
+}
+
 // main fd select
 int main(int argc, char *argv[]) {
 	main_thread = pthread_self();
 	threads_init();
+
+	init_uart_data();
 
 	if (init_wiringPi() == -1) {
 		printf("wirig pi failed\n");
@@ -381,9 +357,8 @@ int main(int argc, char *argv[]) {
 			if (r >= 0) {
 				
 				if (FD_ISSET(uart_fd, &readfds)) {
-
 					uart_data[uart_fd].state = UART_READING;
-					uart_data[uart_fd].pos = 0;
+					//uart_data[uart_fd].pos = 0;
 					
 					struct gateway_op *message = message_queue_message_alloc_blocking(&uart_r_queue);
 					message->operation = OP_READ_UART;
