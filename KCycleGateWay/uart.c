@@ -21,7 +21,7 @@ static struct termios option_tmp;
 
 static int initport(int fd)
 {
-	struct termios newoptions;
+    struct termios newoptions;
 
     tcgetattr (fd, &options);
 

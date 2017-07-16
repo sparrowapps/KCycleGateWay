@@ -6,17 +6,17 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "KCycleGateWay", "KCycleGateWay\KCycleGateWay.vcxproj", "{2219F4E8-0979-43C3-84D3-FCE05E949885}"
 EndProject
 Global
-	GlobalSection(SolutionConfigurationPlatforms) = preSolution
-		Debug|ARM = Debug|ARM
-		Release|ARM = Release|ARM
-	EndGlobalSection
-	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{2219F4E8-0979-43C3-84D3-FCE05E949885}.Debug|ARM.ActiveCfg = Debug|ARM
-		{2219F4E8-0979-43C3-84D3-FCE05E949885}.Debug|ARM.Build.0 = Debug|ARM
-		{2219F4E8-0979-43C3-84D3-FCE05E949885}.Release|ARM.ActiveCfg = Release|ARM
-		{2219F4E8-0979-43C3-84D3-FCE05E949885}.Release|ARM.Build.0 = Release|ARM
-	EndGlobalSection
-	GlobalSection(SolutionProperties) = preSolution
-		HideSolutionNode = FALSE
-	EndGlobalSection
+    GlobalSection(SolutionConfigurationPlatforms) = preSolution
+        Debug|ARM = Debug|ARM
+        Release|ARM = Release|ARM
+    EndGlobalSection
+    GlobalSection(ProjectConfigurationPlatforms) = postSolution
+        {2219F4E8-0979-43C3-84D3-FCE05E949885}.Debug|ARM.ActiveCfg = Debug|ARM
+        {2219F4E8-0979-43C3-84D3-FCE05E949885}.Debug|ARM.Build.0 = Debug|ARM
+        {2219F4E8-0979-43C3-84D3-FCE05E949885}.Release|ARM.ActiveCfg = Release|ARM
+        {2219F4E8-0979-43C3-84D3-FCE05E949885}.Release|ARM.Build.0 = Release|ARM
+    EndGlobalSection
+    GlobalSection(SolutionProperties) = preSolution
+        HideSolutionNode = FALSE
+    EndGlobalSection
 EndGlobal

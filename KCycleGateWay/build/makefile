@@ -22,16 +22,16 @@ all: KCycleGateWay
 
 # Tool invocations
 KCycleGateWay: $(OBJS) $(USER_OBJS)
-	@echo 'Building target: $@'
-	@echo 'Invoking: Cross GCC Linker'
-	g++ -o "KCycleGateWay" $(OBJS) $(USER_OBJS) $(LIBS)
-	@echo 'Finished building target: $@'
-	@echo ' '
+    @echo 'Building target: $@'
+    @echo 'Invoking: Cross GCC Linker'
+    g++ -o "KCycleGateWay" $(OBJS) $(USER_OBJS) $(LIBS)
+    @echo 'Finished building target: $@'
+    @echo ' '
 
 # Other Targets
 clean:
-	-$(RM) $(EXECUTABLES)$(OBJS)$(C_DEPS) KCycleGateWay
-	-@echo ' '
+    -$(RM) $(EXECUTABLES)$(OBJS)$(C_DEPS) KCycleGateWay
+    -@echo ' '
 
 .PHONY: all clean dependents
 

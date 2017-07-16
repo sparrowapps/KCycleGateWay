@@ -2,6 +2,8 @@
     "files.associations": {
         "micomd.h": "c",
         "wiringpi.h": "c",
-        "unistd.h": "c"
+        "unistd.h": "c",
+        "_pthread_mutex_t.h": "c",
+        "stdio.h": "c"
     }
 }

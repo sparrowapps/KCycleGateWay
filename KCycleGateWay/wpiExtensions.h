@@ -1,11 +1,11 @@
 /*
  * extensions.h:
- *	Part of the GPIO program to test, peek, poke and otherwise
- *	noodle with the GPIO hardware on the Raspberry Pi.
- *	Copyright (c) 2012-2015 Gordon Henderson
+ *    Part of the GPIO program to test, peek, poke and otherwise
+ *    noodle with the GPIO hardware on the Raspberry Pi.
+ *    Copyright (c) 2012-2015 Gordon Henderson
  ***********************************************************************
  * This file is part of wiringPi:
- *	https://projects.drogon.net/raspberry-pi/wiringpi/
+ *    https://projects.drogon.net/raspberry-pi/wiringpi/
  *
  *    wiringPi is free software: you can redistribute it and/or modify
  *    it under the terms of the GNU Lesser General Public License as published by
