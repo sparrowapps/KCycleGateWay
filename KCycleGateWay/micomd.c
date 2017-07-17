@@ -285,7 +285,7 @@ int ssl_write(unsigned char * msg, unsigned char * outmsg, int * outmsglen) {
 
     //char buf[10000];
     unsigned char * buf;
-    int bytes;
+    int bytes = 0;
 
     SSL_OPEN_TO_SERVER sslOpenToServer;
     printf("ssl write \n");
@@ -306,8 +306,13 @@ int ssl_write(unsigned char * msg, unsigned char * outmsg, int * outmsglen) {
 
     SSLCloseToServer(&sslOpenToServer);
 
-    outmsg = buf;
-    outmsglen = bytes;
+    if (bytes != 0) { 
+        outmsg = buf;
+        outmsglen = bytes
+    } else {
+        outmsg = NULL;
+        outmsglen = 0;
+    }
 
     return 0;
 }
