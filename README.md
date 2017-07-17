@@ -2,6 +2,19 @@
 
 ## 라즈베리파이 라이트버젼 설치
 2017-07-05-raspbian-jessie-lite.img
+
+이미지 다운로드
+
+<http://downloads.raspberrypi.org/raspbian/release_notes.txt>
+
+SD 카드 포멧
+
+<https://www.sdcard.org/downloads/formatter_4/>
+
+ Mac 설치 Etcher 설치
+ 
+<https://etcher.io>
+
 ### ssh 활성
 최신버젼에 jessie-lite를 받아서 메모리카드에 설치 하고 부팅 하면 ssh가 비활성이다.
 
