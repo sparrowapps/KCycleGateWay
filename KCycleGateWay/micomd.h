@@ -50,6 +50,8 @@ typedef signed long int        INT32;
 #define MAX_MASK_BYTE          11
 #define MAX_CMD                20
 
+#define MAX_HTTPS_PACKET_BUFFER 4096
+
 int create_socket (int portnum);
 int read_packet (int fd, int cnt, PBYTE buf, int fd_index);
 int check_socket (PBYTE data_buf, WORD size, int fd);
@@ -64,7 +66,7 @@ int write_packet (int fd, PBYTE pbuf, int size);
 int extract_packet (int cnt, PBYTE buf);
 int encrypt_block(unsigned char* cipherText, unsigned char* plainText, unsigned int plainTextLen, unsigned char* key, unsigned char* ivec);
 int decrypt_block(unsigned char* plainText, unsigned char* cipherText, unsigned int cipherTextLen, unsigned char* key, unsigned char* ivec);
-int ssl_write(unsigned char * msg, int size);
+int ssl_write(unsigned char * msg, unsigned char * outmsg, int * outmsglen);
 int init_wiringPi();
 int open_uart();
 #endif /* _MICOM_H_ */

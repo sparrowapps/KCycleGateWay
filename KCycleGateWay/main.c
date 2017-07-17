@@ -34,14 +34,16 @@ static void handle_uart_request(int fd, char *request);
 static void handle_socket_data(int fd);
 static void handle_socket_request(int fd, char *request);
 static void uart_write(int fd, const char *msg);
-static void http_write(const char *msg);
+static void http_write(const char *msg, int fd);
 
 // Message queue related code
 
 struct gateway_op {
     enum { OP_WRITE_UART, OP_WRITE_HTTP, OP_READ_SOCKET, OP_READ_UART, OP_EXIT } operation;
     const char *message_txt; //
-    int fd;
+    int socketfd;  //소켓 클라이언트
+    int uartfd;    //uart
+
 };
 
 static struct message_queue uart_w_queue;
@@ -60,8 +62,9 @@ static void *uart_write_threadproc(void *dummy) {
     while (1) {
         struct gateway_op *message = message_queue_read(&uart_w_queue);
 
-        if ( message->operation == OP_WRITE_HTTP ) {
-            uart_write( message->fd, message->message_txt );
+        if ( message->operation == OP_WRITE_UART ) {
+            uart_write( message->uartfd, message->message_txt );
+            free((void *)message->message_txt);
             message_queue_message_free(&uart_w_queue, message);
         } else if ( message->operation == OP_EXIT ) {
             message_queue_message_free(&uart_w_queue, message);
@@ -78,7 +81,8 @@ static void *http_write_threadproc(void *dummy) {
         struct gateway_op *message = message_queue_read(&https_queue);
         if ( message->operation == OP_WRITE_HTTP ) { 
             printf("message->operation == OP_WRITE_HTTP\n");
-            http_write( message->message_txt );
+            http_write( message->message_txt , message->uartfd);
+            free((void *)message->message_txt);
             message_queue_message_free(&https_queue, message);
         } else if ( message->operation == OP_EXIT ) {
             message_queue_message_free(&https_queue, message);
@@ -95,7 +99,7 @@ static void *socket_read_threadproc(void *dummy) {
         struct gateway_op *message = message_queue_read(&socket_queue);
         if (message->operation == OP_READ_SOCKET ) {
             printf("OP_READ_SOCKET\n");
-            handle_socket_data(message->fd);
+            handle_socket_data(message->socketfd);
             message_queue_message_free(&socket_queue, message);
         } else if ( message->operation == OP_EXIT ) {
             message_queue_message_free(&socket_queue, message);
@@ -111,7 +115,7 @@ static void *uart_read_threadproc(void *dummy) {
         struct gateway_op *message = message_queue_read(&uart_r_queue);
         if (message->operation == OP_READ_UART ) {
             printf("OP_READ_UART\n");
-            handle_uart_data(message->fd);
+            handle_uart_data(message->uartfd);
             message_queue_message_free(&uart_r_queue, message);
         } else if ( message->operation == OP_EXIT ) {
             message_queue_message_free(&uart_r_queue, message);
@@ -198,12 +202,9 @@ static void handle_socket_data(int fd) {
 
 static void handle_socket_request(int fd, char *request) {
     //ack
-    write(fd,"ack",3);
-    printf("handle_socket_request ack!\n");
-    if(!strncmp(request, "HELLO", 5)) {
-        struct gateway_op *message = message_queue_message_alloc_blocking(&https_queue);
-        message->operation = OP_WRITE_HTTP;
-        message->message_txt = "GET /gateway/hello HTTP/1.1\n\
+    unsigned char * buf;
+    unsigned char msg[1000] =
+"GET /gateway/hello HTTP/1.1\n\
 Host: 115.136.138.81:4432\n\
 Connection: keep-alive\n\
 Cache-Control: max-age=0\n\
@@ -214,6 +215,15 @@ Accept-Encoding: gzip, deflate, sdch, br\n\
 Accept-Language: ko-KR,ko;q=0.8,en-US;q=0.6,en;q=0.4\n\
 Cookie: JSESSIONID=5EBE4E35EBC10452C92EC291149B798F\n\
 ";
+
+    write(fd,"ack",3);
+    printf("handle_socket_request ack!\n");
+    if(!strncmp(request, "HELLO", 5)) {
+        struct gateway_op *message = message_queue_message_alloc_blocking(&https_queue);
+        message->operation = OP_WRITE_HTTP;
+        buf = malloc(MAX_HTTPS_PACKET_BUFFER);
+        memcpy(buf, msg, sizeof(msg));
+        message->message_txt = buf;
         message_queue_write(&https_queue, message);
         close(fd);
         del_socket(fd);
@@ -269,13 +279,15 @@ static void handle_uart_request(int fd, char *request) {
         }
 
         // UART cmd ? HTTP cmd ?
+        // --> https 로 바이패스 하도록 수정 해야 함
+#if 0        
         if(!strncmp(request, "UART", 4)) {
             char *msg_txt = request+4;
 
             struct gateway_op *message = message_queue_message_alloc_blocking(&uart_w_queue);
             message->operation = OP_WRITE_UART;
             message->message_txt = msg_txt;
-            message->fd = fd;
+            message->uartfd = fd;
             message_queue_write(&uart_w_queue, message);
         } else if (!strncmp(request, "HTTP", 4)) {
             char *msg_txt = request+4;
@@ -283,12 +295,12 @@ static void handle_uart_request(int fd, char *request) {
             struct gateway_op *message = message_queue_message_alloc_blocking(&https_queue);
             message->operation = OP_WRITE_HTTP;
             message->message_txt = msg_txt;
-            message->fd = fd;
+            message->socketfd = fd;
             message_queue_write(&https_queue, message);    
         } else {
             close(fd);
         }
-
+#endif
         uart_data[fd].pos = 0;
     } else {
         return;
@@ -299,8 +311,17 @@ static void uart_write(int fd, const char *msg) {
     int r = write_packet(fd, msg, strlen(msg));
 }
 
-static void http_write(const char *msg) {
-    int r = ssl_write( msg, strlen(msg) );
+static void http_write(const char *msg, int fd) {
+    int outmsglen = 0;
+    unsigned char * outmsg;
+    int r = ssl_write( msg, outmsg, &outmsglen );
+    
+    //uart write
+    struct gateway_op *message = message_queue_message_alloc_blocking(&uart_w_queue);
+    message->operation = OP_WRITE_UART;
+    message->message_txt = outmsg;
+    message->uartfd = fd;
+    message_queue_write(&uart_w_queue, message);    
 }
 
 void init_uart_data() {
@@ -362,7 +383,7 @@ int main(int argc, char *argv[]) {
                     
                     struct gateway_op *message = message_queue_message_alloc_blocking(&uart_r_queue);
                     message->operation = OP_READ_UART;
-                    message->fd = uart_fd;
+                    message->uartfd = uart_fd;
                     message_queue_write(&uart_r_queue, message);
                 }
 
@@ -384,7 +405,7 @@ int main(int argc, char *argv[]) {
                             struct gateway_op *message = message_queue_message_alloc_blocking(&socket_queue);
                             printf("message queue write OP_READ_SOCKET\n");
                             message->operation = OP_READ_SOCKET;
-                            message->fd = client_sockfd;
+                            message->socketfd = client_sockfd;
                             
                             message_queue_write(&socket_queue, message);
 

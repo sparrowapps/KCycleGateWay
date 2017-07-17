@@ -237,12 +237,12 @@ static void hex_print(const void* pv, size_t len)
 
 
 // ============================================================================
-//    openssl �� ase �˰��� test�� ���� �ۼ��� �Լ�
-//    �Ʒ��� �ۼ��� ��ó�� ������ ���� ������ ����
-//    1. ����ü ���� SSL_OPEN_TO_SERVER
-//    2. SSLOpenToServer() �Լ� ȣ��
-//    3. ssl read, write
-//    4. SSLCloseToServer() �Լ� ȣ��
+//	openssl 의 ase 알고리즘 test를 위해 작성한 함수
+//	아래에 작성된 것처럼 다음과 같은 순서를 따름
+//	1. 구조체 선언 SSL_OPEN_TO_SERVER
+//	2. SSLOpenToServer() 함수 호출
+//	3. ssl read, write
+//	4. SSLCloseToServer() 함수 호출
 // ============================================================================
 int ssl_test()
 {
@@ -281,9 +281,10 @@ Accept-Language: ko-KR,ko;q=0.8,en-US;q=0.6,en;q=0.4\n\
 }
 
 // ssl http write 
-int ssl_write(unsigned char * msg, int size) {
+int ssl_write(unsigned char * msg, unsigned char * outmsg, int * outmsglen) {
 
-    char buf[10000];
+    //char buf[10000];
+    unsigned char * buf;
     int bytes;
 
     SSL_OPEN_TO_SERVER sslOpenToServer;
@@ -297,11 +298,16 @@ int ssl_write(unsigned char * msg, int size) {
     SSL_write(sslOpenToServer.ssl, msg, strlen(msg));
     BIO_dump_fp(stdout, msg, strlen(msg));
 
+    buf = malloc(MAX_HTTPS_PACKET_BUFFER);
+
     bytes = SSL_read(sslOpenToServer.ssl, buf, sizeof(buf));
     buf[bytes] = 0;
     BIO_dump_fp(stdout, buf, bytes);
 
     SSLCloseToServer(&sslOpenToServer);
+
+    outmsg = buf;
+    outmsglen = bytes;
 
     return 0;
 }
