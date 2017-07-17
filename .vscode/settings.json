@@ -4,6 +4,7 @@
         "wiringpi.h": "c",
         "unistd.h": "c",
         "_pthread_mutex_t.h": "c",
-        "stdio.h": "c"
+        "stdio.h": "c",
+        "bio.h": "c"
     }
 }

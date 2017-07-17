@@ -313,15 +313,17 @@ static void uart_write(int fd, const char *msg) {
 
 static void http_write(const char *msg, int fd) {
     int outmsglen = 0;
-    unsigned char * outmsg;
+    unsigned char * outmsg = NULL;
     int r = ssl_write( msg, outmsg, &outmsglen );
     
     //uart write
-    struct gateway_op *message = message_queue_message_alloc_blocking(&uart_w_queue);
-    message->operation = OP_WRITE_UART;
-    message->message_txt = outmsg;
-    message->uartfd = fd;
-    message_queue_write(&uart_w_queue, message);    
+    if (outmsg != NULL) {
+        struct gateway_op *message = message_queue_message_alloc_blocking(&uart_w_queue);
+        message->operation = OP_WRITE_UART;
+        message->message_txt = outmsg;
+        message->uartfd = fd;
+        message_queue_write(&uart_w_queue, message);
+    }    
 }
 
 void init_uart_data() {
