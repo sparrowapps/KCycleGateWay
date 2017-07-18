@@ -115,6 +115,9 @@ sudo apt-get install nemiver
 vs code로 개발
 
 ## build & run
+
+git clone https://github.com/sparrowapps/KCycleGateWay.git
+
 cd KCycleGateWay/KCycleGateWay/build
 
 make clean; make
