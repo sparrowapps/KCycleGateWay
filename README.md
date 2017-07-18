@@ -5,7 +5,7 @@
 
 이미지 다운로드
 
-<http://downloads.raspberrypi.org/raspbian/release_notes.txt>
+<https://downloads.raspberrypi.org/raspbian_lite_latest>
 
 SD 카드 포멧
 
