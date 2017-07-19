@@ -28,6 +28,8 @@ Description :
 #include "wiringPi.h"
 #include "micomd.h"
 
+#include "logger.h"
+
 // function prototype
 static void handle_uart_data(int fd);
 static void handle_uart_request(int fd, char *request);
@@ -58,7 +60,7 @@ static pthread_t uart_write_thread;
 static pthread_t http_write_thread;
 
 static void *uart_write_threadproc(void *dummy) {
-    printf("uart_write_threadproc start\n");
+    LOG_DEBUG("uart_write_threadproc start\n");
     while (1) {
         struct gateway_op *message = message_queue_read(&uart_w_queue);
 
@@ -76,11 +78,11 @@ static void *uart_write_threadproc(void *dummy) {
 }
 
 static void *http_write_threadproc(void *dummy) {
-    printf("http_write_threadproc start\n");
+    LOG_DEBUG("http_write_threadproc start\n");
     while (1) {
         struct gateway_op *message = message_queue_read(&https_queue);
         if ( message->operation == OP_WRITE_HTTP ) { 
-            printf("message->operation == OP_WRITE_HTTP\n");
+            LOG_DEBUG("message->operation == OP_WRITE_HTTP\n");
             http_write( message->message_txt , message->uartfd);
             free((void *)message->message_txt);
             message_queue_message_free(&https_queue, message);
@@ -94,11 +96,11 @@ static void *http_write_threadproc(void *dummy) {
 
 extern int cnt_fd_socket;
 static void *socket_read_threadproc(void *dummy) {
-    printf("socket_read_threadproc start\n");
+    LOG_DEBUG("socket_read_threadproc start\n");
     while (1)  {
         struct gateway_op *message = message_queue_read(&socket_queue);
         if (message->operation == OP_READ_SOCKET ) {
-            printf("OP_READ_SOCKET\n");
+            LOG_DEBUG("OP_READ_SOCKET\n");
             handle_socket_data(message->socketfd);
             message_queue_message_free(&socket_queue, message);
         } else if ( message->operation == OP_EXIT ) {
@@ -110,11 +112,11 @@ static void *socket_read_threadproc(void *dummy) {
 }
 
 static void *uart_read_threadproc(void *dummy) {
-    printf("uart_read_threadproc start\n");
+    LOG_DEBUG("uart_read_threadproc start\n");
     while(1) {
         struct gateway_op *message = message_queue_read(&uart_r_queue);
         if (message->operation == OP_READ_UART ) {
-            printf("OP_READ_UART\n");
+            LOG_DEBUG("OP_READ_UART\n");
             handle_uart_data(message->uartfd);
             message_queue_message_free(&uart_r_queue, message);
         } else if ( message->operation == OP_EXIT ) {
@@ -181,11 +183,11 @@ struct socket_state socket_data[FD_SETSIZE];
 static void handle_socket_data(int fd) {
     int r;
 
-    printf("handle_socket_data fd %d ", fd);
+    LOG_DEBUG("handle_socket_data fd %d ", fd);
 
 
     if((r = read(fd, socket_data[fd].buf+socket_data[fd].pos, 1024-socket_data[fd].pos)) > 0) {
-        printf("handle_socket_data %s\n",socket_data[fd].buf);
+        LOG_DEBUG("handle_socket_data %s\n",socket_data[fd].buf);
         socket_data[fd].pos += r;
         if(socket_data[fd].pos >= 4 ) {
             socket_data[fd].buf[socket_data[fd].pos] = '\0';
@@ -217,7 +219,7 @@ Cookie: JSESSIONID=5EBE4E35EBC10452C92EC291149B798F\n\
 ";
 
     write(fd,"ack",3);
-    printf("handle_socket_request ack!\n");
+    LOG_DEBUG("handle_socket_request ack!\n");
     if(!strncmp(request, "HELLO", 5)) {
         struct gateway_op *message = message_queue_message_alloc_blocking(&https_queue);
         message->operation = OP_WRITE_HTTP;
@@ -251,7 +253,7 @@ static void handle_uart_data(int fd) {
         uart_data[fd].pos += r;
     }while( r == -1 );
     
-    printf("uart read byte %d\n", uart_data[fd].pos);
+    LOG_DEBUG("uart read byte %d\n", uart_data[fd].pos);
     uart_data[fd].state = UART_INACTIVE;
     handle_uart_request(fd, uart_data[fd].buf);
 
@@ -264,13 +266,13 @@ extern int data_status;
 extern fd_masks[MAX_SOCKET_FD];
 static void handle_uart_request(int fd, char *request) {
     // parse and cmd process
-    printf("handle_uart_request : %s\n", request);
+    LOG_DEBUG("handle_uart_request : %s\n", request);
     int uart_cnt = 0;
     if (parse_data(request , &uart_cnt) == 1) {
-        printf("parse ok  %s uart_cnt %d\n", request,uart_cnt);
+        LOG_DEBUG("parse ok  %s uart_cnt %d\n", request,uart_cnt);
 
         if (uart_cnt >0  || (cmd_state == 13 && list_end == 1) ) {
-            printf("handle_uart_request\n");
+            LOG_DEBUG("handle_uart_request\n");
             if (data_status == 0) {
                 check_rf_data(request);
             } else {
@@ -340,7 +342,7 @@ int main(int argc, char *argv[]) {
     init_uart_data();
 
     if (init_wiringPi() == -1) {
-        printf("wirig pi failed\n");
+        LOG_DEBUG("wirig pi failed\n");
         return -1;
     }
 
@@ -356,12 +358,13 @@ int main(int argc, char *argv[]) {
 
     uart_fd =  open_uart();
     server_sockfd = create_socket(PORT_NUM);
-    printf("uart fd %d\n",uart_fd);
-    printf("server_sockfd fd %d\n",server_sockfd);
+    
+    LOG_DEBUG("uart fd %d", uart_fd);
+    LOG_DEBUG("server_sockfd fd %d\n",server_sockfd);
     max_fd = uart_fd > server_sockfd ? uart_fd : server_sockfd;
-    printf("maxfd %d\n",max_fd);
+    LOG_DEBUG("maxfd %d\n",max_fd);
     max_fd = mk_fds(&readfds, max_fd);
-    printf("maxfd %d\n",max_fd);
+    LOG_DEBUG("maxfd %d\n",max_fd);
 
     if (server_sockfd >=0 && uart_fd >= 0 ) {
         while(1) {
@@ -390,22 +393,22 @@ int main(int argc, char *argv[]) {
                 }
 
                 if (FD_ISSET(server_sockfd, &readfds)) {
-                    printf("SOCKET server_sockfd %d, uart_fd %d, max_fd %d\n", server_sockfd, uart_fd, max_fd);
+                    LOG_DEBUG("SOCKET server_sockfd %d, uart_fd %d, max_fd %d\n", server_sockfd, uart_fd, max_fd);
                     client_sockfd = accept(server_sockfd, (struct sockaddr *)&clientaddr, &client_len);
                     if (client_sockfd < 0) {
-                        printf("Failed to accept the connection request from App Framework!\n");
+                        LOG_DEBUG("Failed to accept the connection request from App Framework!\n");
                     } else {
                         
                         if(add_socket(client_sockfd) == -1) {
-                            printf("Failed to add socket because of the number of socket(%d) !! \n", cnt_fd_socket);
+                            LOG_DEBUG("Failed to add socket because of the number of socket(%d) !! \n", cnt_fd_socket);
                         } else {
-                            printf("App Framework socket connected[fd = %d, cnt_fd = %d]!!!\n", client_sockfd, cnt_fd_socket);
+                            LOG_DEBUG("App Framework socket connected[fd = %d, cnt_fd = %d]!!!\n", client_sockfd, cnt_fd_socket);
 
                             socket_data[client_sockfd].state = SOCKET_READING;
                             socket_data[client_sockfd].pos = 0;
                             
                             struct gateway_op *message = message_queue_message_alloc_blocking(&socket_queue);
-                            printf("message queue write OP_READ_SOCKET\n");
+                            LOG_DEBUG("message queue write OP_READ_SOCKET\n");
                             message->operation = OP_READ_SOCKET;
                             message->socketfd = client_sockfd;
                             
@@ -426,7 +429,7 @@ int main(int argc, char *argv[]) {
         close(server_sockfd);
         uart_close(uart_fd);
 
-        printf("End of GateWay Daemon!\n");
+        LOG_DEBUG("End of GateWay Daemon!\n");
 
         return 0;
 
