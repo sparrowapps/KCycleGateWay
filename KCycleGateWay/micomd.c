@@ -308,7 +308,7 @@ int ssl_write(unsigned char * msg, unsigned char * outmsg, int * outmsglen) {
 
     if (bytes != 0) { 
         outmsg = buf;
-        outmsglen = bytes
+        outmsglen = bytes;
     } else {
         outmsg = NULL;
         outmsglen = 0;
