@@ -13,15 +13,20 @@ gateway                     서버
         00 0 000000000 4 INT4
         <------------------ 
 
-        //GET /whatismyjob?jobno={INT4}  일거리 잇느냐?
+        GET /whatismyjob?jobno={INT4}  일거리 잇느냐?
         ------------------> 
 
-        <------------------
+        {"Result":"Succes", "Message":"Job", "JobName":"allOff"}
+        <------------------ 
         printf("send off message to all DEVICE \n");
         printf("OK response from DEVICE\n");
 
-        //GET /changeStatusAllOff  일거리 잇느냐?
+        GET /changeStatusAllOff
         ------------------>
+
+        HTTP 200 OK
+        {"Result":"Succes"}
+        <------------------
 ============================================================================
 
 */
@@ -220,31 +225,52 @@ static void handle_socket_data(int fd) {
 static void handle_socket_request(int fd, char *request) {
     //ack
     unsigned char * buf;
-    unsigned char msg[1000] =
-"POST /gateway/hello HTTP/1.1\n\
-Host: 192.168.11.15:443\n\
-Connection: keep-alive\n\
-Cache-Control: max-age=0\n\
-Upgrade-Insecure-Requests: 1\n\
-User-Agent: Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36\n\
-Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8\n\
-Accept-Encoding: gzip, deflate, sdch, br\n\
-Accept-Language: ko-KR,ko;q=0.8,en-US;q=0.6,en;q=0.4\n\
-Cookie: JSESSIONID=5EBE4E35EBC10452C92EC291149B798F\n\
-Content-Length: 61\n\
-Content-Type: application/json\n\
-\n\
-{\"data\":\"01020304050607080910111213141516171819202122232425\"}\
-";
+//     unsigned char msg[1000] =
+// "POST /gateway/hello HTTP/1.1\n\
+// Host: 192.168.11.15:443\n\
+// Connection: keep-alive\n\
+// Cache-Control: max-age=0\n\
+// Upgrade-Insecure-Requests: 1\n\
+// User-Agent: Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36\n\
+// Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8\n\
+// Accept-Encoding: gzip, deflate, sdch, br\n\
+// Accept-Language: ko-KR,ko;q=0.8,en-US;q=0.6,en;q=0.4\n\
+// Cookie: JSESSIONID=5EBE4E35EBC10452C92EC291149B798F\n\
+// Content-Length: 61\n\
+// Content-Type: application/json\n\
+// \n\
+// {\"data\":\"01020304050607080910111213141516171819202122232425\"}\
+// ";
+
+//     unsigned char * msg2;
 
 
-    write(fd,"ack\n",4);
+    write(fd,"ack\0",4);
     LOG_DEBUG("handle_socket_request ack!\n");
     if(!strncmp(request, "01020304050607080910111213141516171819202122232425", 50)) {
         struct gateway_op *message = message_queue_message_alloc_blocking(&https_queue);
         message->operation = OP_WRITE_HTTP;
         buf = malloc(MAX_HTTPS_PACKET_BUFFER);
-        memcpy(buf, msg, sizeof(msg));
+        sprintf(buf, HTTP_MSG_HELLO, HTTPS_IP_ADDR, HTTPS_PORT_NUM);
+        message->message_txt = buf;
+        message_queue_write(&https_queue, message);
+        close(fd);
+        del_socket(fd);
+    }else if (!strncmp(request, "00000000000004", 14)) {
+
+        char jobno[5];
+        jobno[0] = *(request + 14);
+        jobno[1] = *(request + 15);
+        jobno[2] = *(request + 16);
+        jobno[3] = *(request + 17);
+        jobno[4] = 0;
+
+        struct gateway_op *message = message_queue_message_alloc_blocking(&https_queue);
+        message->operation = OP_WRITE_HTTP;
+
+        buf = malloc(MAX_HTTPS_PACKET_BUFFER);
+        sprintf(buf, HTTP_MSG_WHATISMYJOB ,jobno, HTTPS_IP_ADDR, HTTPS_PORT_NUM);
+        
         message->message_txt = buf;
         message_queue_write(&https_queue, message);
         close(fd);
@@ -336,15 +362,31 @@ static void uart_write(int fd, const char *msg) {
 static void http_write(const char *msg, int fd) {
     int outmsglen = 0;
     unsigned char * outmsg = NULL;
-    int r = ssl_write( msg, outmsg, &outmsglen );
-    
+    int r = ssl_write( msg, &outmsg, &outmsglen );
+
+
     //uart write
     if (outmsg != NULL) {
-        struct gateway_op *message = message_queue_message_alloc_blocking(&uart_w_queue);
-        message->operation = OP_WRITE_UART;
-        message->message_txt = outmsg;
-        message->uartfd = fd;
-        message_queue_write(&uart_w_queue, message);
+
+        // 받은 메세지를 uart로 쏠때
+        // struct gateway_op *message = message_queue_message_alloc_blocking(&uart_w_queue);
+        // message->operation = OP_WRITE_UART;
+        // message->message_txt = outmsg;
+        // message->uartfd = fd;
+        // message_queue_write(&uart_w_queue, message);
+        if ( strstr(outmsg, "allOff") != NULL ) {
+            printf("send off message to all DEVICE \n");
+            printf("OK response from DEVICE\n");
+            
+            unsigned char * buf;
+            struct gateway_op *message = message_queue_message_alloc_blocking(&https_queue);
+            message->operation = OP_WRITE_HTTP;
+
+            buf = malloc(MAX_HTTPS_PACKET_BUFFER);
+            sprintf(buf, HTTP_MSG_CHANGESTATUS_ALLOFF, HTTPS_IP_ADDR, HTTPS_PORT_NUM);
+            message->message_txt = buf;
+            message_queue_write(&https_queue, message);  
+        }
     }    
 }
 

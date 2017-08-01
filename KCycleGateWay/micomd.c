@@ -281,21 +281,21 @@ Accept-Language: ko-KR,ko;q=0.8,en-US;q=0.6,en;q=0.4\n\
 }
 
 // ssl http write 
-int ssl_write(unsigned char * msg, unsigned char * outmsg, int * outmsglen) {
+int ssl_write(unsigned char * msg, unsigned char ** outmsg, int * outmsglen) {
 
     //char buf[10000];
     unsigned char * buf;
     int bytes = 0;
 
     SSL_OPEN_TO_SERVER sslOpenToServer;
-    printf("ssl write \n");
-    printf("ssl write ip : %s \n", HTTPS_IP_ADDR);
+
+
     if (SSLOpenToServer(&sslOpenToServer, HTTPS_IP_ADDR, HTTPS_PORT_NUM) != SSL_OPEN_TO_SERVER_SUCCESS)
     {
         puts("SSLOpenToServer fail\n");
         return -1;
     }
-    printf("ssl write ip : %s \n", HTTPS_IP_ADDR);
+
 
     SSL_write(sslOpenToServer.ssl, msg, strlen(msg));
     BIO_dump_fp(stdout, msg, strlen(msg));
@@ -308,17 +308,17 @@ int ssl_write(unsigned char * msg, unsigned char * outmsg, int * outmsglen) {
     bytes = SSL_read(sslOpenToServer.ssl, buf, MAX_HTTPS_PACKET_BUFFER);
     buf[bytes] = 0;
 
-    printf("\n response %d \n", bytes );
+    printf("\n https response %d bytes\n", bytes);
     BIO_dump_fp(stdout, buf, bytes);
 
     SSLCloseToServer(&sslOpenToServer);
 
     if (bytes != 0) { 
-        outmsg = buf;
-        outmsglen = bytes;
+        *outmsg = buf;
+        *outmsglen = bytes;
     } else {
-        outmsg = NULL;
-        outmsglen = 0;
+        *outmsg = NULL;
+        *outmsglen = 0;
     }
 
     return 0;
