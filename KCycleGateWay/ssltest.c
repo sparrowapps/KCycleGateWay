@@ -19,9 +19,11 @@ int SSLOpenToServer(SSL_OPEN_TO_SERVER *sslOpenToServer, char *hostName, char *p
     strcpy(sslOpenToServer->hostName, hostName);
     strcpy(sslOpenToServer->portNumber, portNumber);
 
+printf("before ssl init \n");
        // SSL library init
     SSL_library_init();
 
+         printf("0\n");     
        // crypto에서 모든 algrithm을 load
        OpenSSL_add_all_algorithms();
 
@@ -31,9 +33,12 @@ int SSLOpenToServer(SSL_OPEN_TO_SERVER *sslOpenToServer, char *hostName, char *p
        // TLS1(=SSL3)를 사용한다고 설정
        method = TLSv1_2_client_method();
 
+         printf("1\n");     
        // create SSL context
        sslOpenToServer->ctx = SSL_CTX_new(method);
-       if ( sslOpenToServer->ctx == NULL )
+       
+         printf("2\n");     
+	if ( sslOpenToServer->ctx == NULL )
        {
               ERR_print_errors_fp(stderr);
               return SSL_OPEN_TO_SERVER_FAIL_TO_NEW_SSL_CTX;
@@ -44,6 +49,7 @@ int SSLOpenToServer(SSL_OPEN_TO_SERVER *sslOpenToServer, char *hostName, char *p
         struct sockaddr_in addr;
         int port;
 
+        printf("3\n");     
         if ( (host = gethostbyname(sslOpenToServer->hostName)) == NULL )
         {
             perror(sslOpenToServer->hostName);
@@ -56,12 +62,18 @@ int SSLOpenToServer(SSL_OPEN_TO_SERVER *sslOpenToServer, char *hostName, char *p
             perror(sslOpenToServer->hostName);
                   return SSL_OPEN_TO_SERVER_FAIL_TO_CREATE_SOCKET;
         }
+
+         printf("4\n");     
         bzero(&addr, sizeof(addr));
+        printf("5\n"); 
         addr.sin_family = AF_INET;
+        printf("6\n"); 
         addr.sin_port = htons(port);
-              
+        printf("7\n"); 
+        printf("before connect\n");     
+        
         //addr.sin_addr.s_addr = *(long*)(host->h_addr);
-              addr.sin_addr.s_addr = *(long*)(host->h_addr_list);
+        addr.sin_addr.s_addr = *(long*)(host->h_addr_list[0]);
         if ( connect(sslOpenToServer->socketDescriptor, (struct sockaddr*)&addr, sizeof(addr)) != 0 )
         {
             close(sslOpenToServer->socketDescriptor);

@@ -289,19 +289,25 @@ int ssl_write(unsigned char * msg, unsigned char * outmsg, int * outmsglen) {
 
     SSL_OPEN_TO_SERVER sslOpenToServer;
     printf("ssl write \n");
+    printf("ssl write ip : %s \n", HTTPS_IP_ADDR);
     if (SSLOpenToServer(&sslOpenToServer, HTTPS_IP_ADDR, HTTPS_PORT_NUM) != SSL_OPEN_TO_SERVER_SUCCESS)
     {
         puts("SSLOpenToServer fail\n");
         return -1;
     }
+    printf("ssl write ip : %s \n", HTTPS_IP_ADDR);
 
     SSL_write(sslOpenToServer.ssl, msg, strlen(msg));
     BIO_dump_fp(stdout, msg, strlen(msg));
+
+   
 
     buf = malloc(MAX_HTTPS_PACKET_BUFFER);
 
     bytes = SSL_read(sslOpenToServer.ssl, buf, sizeof(buf));
     buf[bytes] = 0;
+
+    printf("\n response \n");
     BIO_dump_fp(stdout, buf, bytes);
 
     SSLCloseToServer(&sslOpenToServer);

@@ -11,8 +11,8 @@ typedef signed long int        INT32;
 #define SOCK_IP_ADDR           "127.0.0.1"
 #define PORT_NUM               8443
 
-#define HTTPS_IP_ADDR          "115.136.138.81"
-#define HTTPS_PORT_NUM         "8443"
+#define HTTPS_IP_ADDR          "192.168.11.15"
+#define HTTPS_PORT_NUM         "443"
 
 /* fd index */
 #define UART                   1

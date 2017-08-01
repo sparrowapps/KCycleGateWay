@@ -7,6 +7,21 @@ Date        : 2017.07.03
 Copyright   : 
 Description : 
 
+
+gateway                     서버
+        2BYTE CODE 1SUBCODE AC 10BYTE LENGTH1 = 4 VALUE 4BYTE INT
+        00 0 000000000 4 INT4
+        <------------------ 
+
+        //GET /whatismyjob?jobno={INT4}  일거리 잇느냐?
+        ------------------> 
+
+        <------------------
+        printf("send off message to all DEVICE \n");
+        printf("OK response from DEVICE\n");
+
+        //GET /changeStatusAllOff  일거리 잇느냐?
+        ------------------>
 ============================================================================
 
 */
@@ -206,8 +221,8 @@ static void handle_socket_request(int fd, char *request) {
     //ack
     unsigned char * buf;
     unsigned char msg[1000] =
-"GET /gateway/hello HTTP/1.1\n\
-Host: 115.136.138.81:4432\n\
+"POST /gateway/hello HTTP/1.1\n\
+Host: 192.168.11.15:443\n\
 Connection: keep-alive\n\
 Cache-Control: max-age=0\n\
 Upgrade-Insecure-Requests: 1\n\
@@ -216,11 +231,15 @@ Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0
 Accept-Encoding: gzip, deflate, sdch, br\n\
 Accept-Language: ko-KR,ko;q=0.8,en-US;q=0.6,en;q=0.4\n\
 Cookie: JSESSIONID=5EBE4E35EBC10452C92EC291149B798F\n\
+Content-Length: 61\n\
+Content-Type: application/json\n\n\
+{\"data\":\"01020304050607080910111213141516171819202122232425\"}\
 ";
+
 
     write(fd,"ack",3);
     LOG_DEBUG("handle_socket_request ack!\n");
-    if(!strncmp(request, "HELLO", 5)) {
+    if(!strncmp(request, "01020304050607080910111213141516171819202122232425", 50)) {
         struct gateway_op *message = message_queue_message_alloc_blocking(&https_queue);
         message->operation = OP_WRITE_HTTP;
         buf = malloc(MAX_HTTPS_PACKET_BUFFER);
