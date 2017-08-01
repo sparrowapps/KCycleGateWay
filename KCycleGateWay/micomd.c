@@ -597,7 +597,7 @@ int create_socket (int portnum)
 
     bzero(&address, sizeof(address));
     address.sin_family = AF_INET;
-    address.sin_addr.s_addr = inet_addr(SOCK_IP_ADDR);
+    //address.sin_addr.s_addr = inet_addr(SOCK_IP_ADDR);
     address.sin_port = htons(portnum);
 
     // prevent bind error
