@@ -232,12 +232,13 @@ Accept-Encoding: gzip, deflate, sdch, br\n\
 Accept-Language: ko-KR,ko;q=0.8,en-US;q=0.6,en;q=0.4\n\
 Cookie: JSESSIONID=5EBE4E35EBC10452C92EC291149B798F\n\
 Content-Length: 61\n\
-Content-Type: application/json\n\n\
+Content-Type: application/json\n\
+\n\
 {\"data\":\"01020304050607080910111213141516171819202122232425\"}\
 ";
 
 
-    write(fd,"ack",3);
+    write(fd,"ack\n",4);
     LOG_DEBUG("handle_socket_request ack!\n");
     if(!strncmp(request, "01020304050607080910111213141516171819202122232425", 50)) {
         struct gateway_op *message = message_queue_message_alloc_blocking(&https_queue);

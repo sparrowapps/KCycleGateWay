@@ -303,11 +303,12 @@ int ssl_write(unsigned char * msg, unsigned char * outmsg, int * outmsglen) {
    
 
     buf = malloc(MAX_HTTPS_PACKET_BUFFER);
+    memset(buf,MAX_HTTPS_PACKET_BUFFER,0x00);
 
-    bytes = SSL_read(sslOpenToServer.ssl, buf, sizeof(buf));
+    bytes = SSL_read(sslOpenToServer.ssl, buf, MAX_HTTPS_PACKET_BUFFER);
     buf[bytes] = 0;
 
-    printf("\n response \n");
+    printf("\n response %d \n", bytes );
     BIO_dump_fp(stdout, buf, bytes);
 
     SSLCloseToServer(&sslOpenToServer);
