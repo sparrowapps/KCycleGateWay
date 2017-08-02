@@ -302,18 +302,20 @@ static void handle_uart_data(int fd) {
     LOG_DEBUG("uart read byte %d\n", uart_data[fd].pos);
     uart_data[fd].state = UART_INACTIVE;
     handle_uart_request(fd, uart_data[fd].buf);
-
-    
 }
 
 extern int list_end;
 extern int cmd_state;
 extern int data_status;
 extern fd_masks[MAX_SOCKET_FD];
+extern unsigned char cmd_buffer[MAX_CMD][MAX_PACKET_BUFFER];
+extern int cmd_id;
+extern int ipc_send_flag;
 static void handle_uart_request(int fd, char *request) {
     // parse and cmd process
     LOG_DEBUG("handle_uart_request : %s\n", request);
-    int uart_cnt = 0;
+    int uart_cnt = uart_data[fd].pos;
+    
     if (parse_data(request , &uart_cnt) == 1) {
         LOG_DEBUG("parse ok  %s uart_cnt %d\n", request,uart_cnt);
 
@@ -324,6 +326,23 @@ static void handle_uart_request(int fd, char *request) {
             } else {
                 check_uart(request);
             }
+        }
+
+        // ipc_send_flag : AT 전송 데이터
+        if (ipc_send_flag == 1) {
+            struct gateway_op *message = message_queue_message_alloc_blocking(&uart_w_queue);
+            printf("cmd_id %d\n",cmd_id);
+            printf("send to uart...[fd:%d, cmd_buffer[%d]: %s].... \n", fd, strlen((char *)cmd_buffer[cmd_id]), (char *)cmd_buffer[cmd_id]);
+            message->operation = OP_WRITE_UART;
+
+            cmd_state = cmd_id; //이전 전송 메세지를 할당
+            
+            unsigned char * buf;
+            buf = malloc(MAX_PACKET_BUFFER);
+            memcpy(buf, cmd_buffer[cmd_id], MAX_PACKET_BUFFER);
+            message->message_txt = buf;
+            message->uartfd = fd;
+            message_queue_write(&uart_w_queue, message);
         }
 
         // UART cmd ? HTTP cmd ?
@@ -350,6 +369,7 @@ static void handle_uart_request(int fd, char *request) {
         }
 #endif
         uart_data[fd].pos = 0;
+        memset(uart_data[fd].buf, 0x00, sizeof (uart_data[fd].buf));
     } else {
         return;
     }

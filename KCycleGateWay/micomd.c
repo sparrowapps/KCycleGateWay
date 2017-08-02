@@ -25,6 +25,7 @@
 #include "uart.h"
 #include "wiringPi.h"
 #include "ssltest.h"
+#include "logger.h"
 
 #define RST 9
 #define PIO 7
@@ -54,9 +55,9 @@ BYTE Sock1TempBuf[MAX_SOCKET_FD][MAX_PACKET_BUFFER];
 BYTE TempMsgBuf[MAX_PACKET_BUFFER];
 int sock1_cnt[MAX_SOCKET_FD];
 
-int cmd_id = 0;
-int cmd_state = -1;
-int list_end = 0;
+int cmd_id = 0; 
+int cmd_state = -1; // 이전 커맨드 id
+int list_end = 0; // 
 int op_mode = 0;
 int packet_size = 0;
 BYTE grp_id[3] = {0, 0, 0};
@@ -67,10 +68,10 @@ int rf_channel = -1;
 int bcst_status = 0;
 int data_rate = -1;
 int rand_channel = -1;
-int pair_status = 0;
-int data_status = 0;
-int rst_status = 0;
-int device_idx = 0;
+int pair_status = 0; // pair 유무 UNPARED 문자 확인 
+int data_status = 0; // AT 커맨드로 데이터를 처리 할때 data_status 1
+int rst_status = 0;  // AT reset 처리 했을때 1
+int device_idx = 0; 
 
 typedef struct list_id {
     BYTE dev_addr;
@@ -145,6 +146,12 @@ unsigned char Expected_OutputMessage[] =
   0xf6, 0xec, 0xed, 0xd4, 0x19, 0xdb, 0x06, 0xc1
 };
 
+/*
+enum AT_CMD_TYPE {
+    AT_START = 0,
+
+}
+*/
 
 BYTE cmd_buffer[MAX_CMD][MAX_PACKET_BUFFER] = 
 {
@@ -720,29 +727,31 @@ int check_rf_data(PBYTE data_buf)
             token = strtok(NULL, div);
         }
 
-        if(op_mode != 1 || pair_status != 1)
+        if(op_mode != 1 )
         {
             cmd_id = 0;
             ipc_send_flag = 1;
             data_status = 1;
             printf("send_message = %s , send_flag = %d\n", cmd_buffer[0], ipc_send_flag);
         }
-        else if(rst_status == 1)
+        else 
         {
-            ipc_send_flag = 0;
-            rst_status = 0;
-            data_status = 0;
-            printf("data receiving status................\n");
+            if(rst_status == 1)
+            {
+                ipc_send_flag = 0;
+                rst_status = 0;
+                data_status = 0;
+                cmd_state = 14;
+                printf("data receiving status................\n");
+            }
+            else
+            {
+               cmd_state = 14;
+            }
         }
-        else
-        {
-            cmd_id = 0;
-            ipc_send_flag = 1;
-            data_status = 1;
-            printf("send message[%s] in pairing status.....\n", cmd_buffer[0]);
-        }
+        
     }
-    else
+    else // addr, , packet
     {
         char* token = NULL;
         char div[] = ",\r\n";
@@ -766,9 +775,6 @@ int check_rf_data(PBYTE data_buf)
             else
             {
                 rf_data_parser(data_buf);
-                cmd_id = 19;
-                ipc_send_flag = 0;
-                ssl_send_flag = 1;
             }
 
             token = strtok(NULL, div);
@@ -836,24 +842,26 @@ int check_uart (PBYTE data_buf)
             token = strtok(NULL, div);
         }
 
-        if(op_mode != 1 || pair_status != 1)
+        if(op_mode != 1)
         {
             cmd_id = 0;
             ipc_send_flag = 1;
             printf("send_message = %s , send_flag = %d\n", cmd_buffer[0], ipc_send_flag);
         }
-        else if(rst_status == 1)
+        else 
         {
-            ipc_send_flag = 0;
-            rst_status = 0;
-            data_status = 0;
-            printf("data receiving status................\n");
-        }
-        else
-        {
-            cmd_id = 0;
-            ipc_send_flag = 1;
-            printf("send message[%s] in pairing status.....\n", cmd_buffer[0]);
+            if(rst_status == 1)
+            {
+                ipc_send_flag = 0;
+                rst_status = 0;
+                data_status = 0;
+                cmd_state = 14;
+                printf("data receiving status................\n");
+            }
+            else
+            {
+                cmd_state = 14;
+            }
         }
     }
     else if(memcmp(data_buf, AT_ST_HEADER, 8) == 0)
@@ -1062,7 +1070,110 @@ int check_uart (PBYTE data_buf)
 
 int rf_data_parser(PBYTE data_buf)
 {
+    unsigned char *p;
+    p = data_buf;
+    unsigned char code = data_buf[0];
+    unsigned char subcode = data_buf[1];
+    unsigned char ac[10];
+    unsigned char senderid[3];
+    unsigned char packetnumber[2]; //2byte int
+    
 
+    printf ("code %02X", code);
+    printf ("subcode %02X", subcode);
+
+    p = p + 2;
+    memcpy(ac, p, 10);
+    p = p + 10;
+    unsigned char len = (unsigned char) *(p);
+    p = p + 1;
+    unsigned char * value;
+    unsigned char * plaintextValue;
+    value = malloc((int)len);
+    plaintextValue = malloc((int)len);
+    memset(plaintextValue, 0x00, (int)len);
+    memcpy(value, p, (int)len);
+
+    //varify ac code
+    senderid [0] = ac[0];
+    senderid [1] = ac[1];
+    senderid [2] = ac[2];
+    packetnumber[0] = ac[3];
+    packetnumber[1] = ac[4];
+
+    printf ("sender id %02x, %02x, %02x\n", senderid[0], senderid[1], senderid[2]);
+    unsigned short pn = 0;
+    pn = packetnumber[1] << 8 +  packetnumber[0];
+    printf ("packet num %d\n", (short)packetnumber );
+
+    unsigned char digest[SHA256_DIGEST_LENGTH];
+    unsigned char enc_out[1000];
+    unsigned char dec_out[1000];
+    unsigned char enc_temp[1000];
+
+    memset(enc_out, 0, sizeof(enc_out));
+    memset(dec_out, 0, sizeof(dec_out));
+    memset(enc_temp, 0, sizeof(enc_temp));
+
+    int encslength = encrypt_block(enc_out, ac, 5, Key, IV);
+    SHA256_CTX ctx;
+    SHA256_Init(&ctx);
+    SHA256_Update(&ctx, enc_out, encslength);
+    SHA256_Final(digest, &ctx);
+
+    if ( memcmp(ac + 5, digest + 27, 5) != 0 ) {
+        printf("ac code fail\n");
+        return 0;
+    } 
+
+    // value decrypt
+    int decslength = decrypt_block(dec_out, value, (int)len, Key, IV);
+    memcpy(plaintextValue, dec_out, decslength);
+    printf("plaintext :%s", plaintextValue);
+
+    // 내 아이디를 얻어 놔야 한다.
+
+    //make packet (PING)
+    
+    //make ac;
+    short packetnum = pn + 1;
+
+    //sender id
+    ac[0] = 0x00;
+    ac[1] = 0x00;
+    ac[2] = 0x01;
+    
+    // packet num memcpy로?
+    ac[3] = packetnum % 8;
+    ac[4] = packetnum / 8;
+
+    memset(enc_out, 0, sizeof(enc_out));
+    memset(dec_out, 0, sizeof(dec_out));
+    memset(enc_temp, 0, sizeof(enc_temp));
+    memset(digest, 0x00, sizeof(digest));
+
+    encslength = encrypt_block(enc_out, ac, 5, Key, IV);
+   
+    SHA256_Init(&ctx);
+    SHA256_Update(&ctx, enc_out, encslength);
+    SHA256_Final(digest, &ctx);
+
+    memcpy(ac + 5, digest + 27, 5);
+
+    unsigned char * plText = "PING MSG";
+    memset(enc_out, 0, sizeof(enc_out));
+    encslength = encrypt_block(enc_out, ac, 5, Key, IV);
+
+    unsigned char packetbuf[MAX_PACKET_BUFFER];
+    packetbuf[0] = code;
+    packetbuf[1] = subcode;
+    memcpy(packetbuf + 2, ac, 10);
+    packetbuf[12] = encslength;
+    memcpy(packetbuf+ 12, enc_out, encslength);
+
+    ipc_send_flag = 1;
+    memcpy(cmd_buffer+ 14, packetbuf, MAX_PACKET_BUFFER);
+    cmd_id = 14;
 }
 
 BYTE* hex_decode(char *in, int len, BYTE *out)
@@ -1079,7 +1190,11 @@ BYTE* hex_decode(char *in, int len, BYTE *out)
     }
     return out;
 }
-
+/*
+RDY SW:CD06.0
+BAND:3,CHN:0,DRATE:2,MODE:0
+UNPAIRED
+*/
 
 int parse_data (PBYTE data_buf, int *cnt)
 {
@@ -1102,7 +1217,7 @@ int parse_data (PBYTE data_buf, int *cnt)
             index++;
     }
 
-    //printf("parse_data ===> cmd_state[%d], index[%d]\n", cmd_state, index);
+    printf("parse_data ===> cmd_state[%d], index[%d]\n", cmd_state, index);
     if(cmd_state != -1 && cmd_state != 0)
     {
         if(cmd_state == 12)
@@ -1130,6 +1245,7 @@ int parse_data (PBYTE data_buf, int *cnt)
     {
         if(cmd_state == -1)
         {
+            LOG_DEBUG("parse_data ===> cmd_state[%d], index[%d]\n", cmd_state, index);
             if(index >= 3)
             {
                 printf("parse_data ===> cmd_state[%d], index[%d]\n", cmd_state, index);
@@ -1169,7 +1285,7 @@ int get_max_fd (int a, int b, int c) {
 }
 
 
-int write_packet (int fd, PBYTE pbuf, int size) {
+int write_packet (int fd, const PBYTE pbuf, int size) {
     int wrtsize = 0;
     int it = 0;
     char msg[100] = {0, };
@@ -1179,11 +1295,7 @@ int write_packet (int fd, PBYTE pbuf, int size) {
             wrtsize += write(fd, pbuf+wrtsize, size-wrtsize);
         } while ((size - wrtsize) > 0);
 
-        for(it = 0; it < size; it++) {
-            sprintf(msg, "%x ", *(pbuf + it));
-        }
-
-        printf("write packet fd(%d), size(%d), data = [%s] \n", fd, size, msg);
+        printf("write packet fd(%d), size(%d)\n", fd, size);
 
         return 0;
     } else {

@@ -11,7 +11,7 @@ typedef signed long int        INT32;
 #define SOCK_IP_ADDR           "127.0.0.1"
 #define PORT_NUM               8443
 
-#define HTTPS_IP_ADDR          "192.168.11.15"
+#define HTTPS_IP_ADDR          "160.100.1.147"
 #define HTTPS_PORT_NUM         "443"
 
 /* fd index */
@@ -106,7 +106,7 @@ BYTE* hex_decode(char *in, int len, BYTE *out);
 int parse_data (PBYTE data_buf, int *cnt);
 int get_max_fd (int a, int b, int c);
 void send_socket_control_data(PBYTE data_buf, int length);
-int write_packet (int fd, PBYTE pbuf, int size);
+int write_packet (int fd,const PBYTE pbuf, int size);
 int extract_packet (int cnt, PBYTE buf);
 int encrypt_block(unsigned char* cipherText, unsigned char* plainText, unsigned int plainTextLen, unsigned char* key, unsigned char* ivec);
 int decrypt_block(unsigned char* plainText, unsigned char* cipherText, unsigned int cipherTextLen, unsigned char* key, unsigned char* ivec);
