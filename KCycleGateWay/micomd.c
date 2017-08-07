@@ -729,7 +729,7 @@ int check_rf_data(PBYTE data_buf)
 
         if(op_mode != 1 )
         {
-            cmd_id = 0;
+            cmd_id = _AT_START;
             ipc_send_flag = 1;
             data_status = 1;
             printf("send_message = %s , send_flag = %d\n", cmd_buffer[0], ipc_send_flag);
@@ -741,12 +741,12 @@ int check_rf_data(PBYTE data_buf)
                 ipc_send_flag = 0;
                 rst_status = 0;
                 data_status = 0;
-                cmd_state = 14;
+                cmd_state = _AT_USER_CMD;
                 printf("data receiving status................\n");
             }
             else
             {
-               cmd_state = 14;
+               cmd_state = _AT_USER_CMD;
             }
         }
         
@@ -768,7 +768,7 @@ int check_rf_data(PBYTE data_buf)
             }
             else if(memcmp(token, PING_CHECK, 4) == 0)
             {
-                cmd_id = 14;
+                cmd_id = _AT_USER_CMD;
                 sprintf(cmd_buffer[14], "%d,ping\r\n", addr);
                 ipc_send_flag = 1;
             }
@@ -844,7 +844,7 @@ int check_uart (PBYTE data_buf)
 
         if(op_mode != 1)
         {
-            cmd_id = 0;
+            cmd_id = _AT_START;
             ipc_send_flag = 1;
             printf("send_message = %s , send_flag = %d\n", cmd_buffer[0], ipc_send_flag);
         }
@@ -855,24 +855,24 @@ int check_uart (PBYTE data_buf)
                 ipc_send_flag = 0;
                 rst_status = 0;
                 data_status = 0;
-                cmd_state = 14;
+                cmd_state = _AT_USER_CMD;
                 printf("data receiving status................\n");
             }
             else
             {
-                cmd_state = 14;
+                cmd_state = _AT_USER_CMD;
             }
         }
     }
     else if(memcmp(data_buf, AT_ST_HEADER, 8) == 0)
     {
-        cmd_id = 1;
+        cmd_id = _AT_ACODE;
         data_status = 1;
         ipc_send_flag = 1;
     }
     else if(memcmp(data_buf, AT_LOCKED, 6) == 0)
     {
-        cmd_id = 1;
+        cmd_id = _AT_ACODE;
         ipc_send_flag = 1;
     }
     else if(memcmp(data_buf, AT_PAIR, 9) == 0)
@@ -899,11 +899,11 @@ int check_uart (PBYTE data_buf)
     {
         switch(cmd_state)
         {
-            case 1:
+            case _AT_ACODE:
 #if 1
                 if(pair_status == 1)
                 {
-                    cmd_id = 13;
+                    cmd_id = _AT_LST_ID;
                     ipc_send_flag = 1;
                     device_idx = 0;
                     //rst_status = 1;
@@ -911,12 +911,12 @@ int check_uart (PBYTE data_buf)
                 else
 #endif
                 {
-                    cmd_id = 2;
+                    cmd_id = _AT_MODE;
                     ipc_send_flag = 1;
                 }
                 break;
 
-            case 2:
+            case _AT_MODE:
                 op_mode = 1;
 #if 0
                 if(pair_status == 1)
@@ -929,63 +929,63 @@ int check_uart (PBYTE data_buf)
                 else
 #endif
                 {
-                    cmd_id = 4;
+                    cmd_id = _AT_FBND;
                     ipc_send_flag = 1;
                 }
                 break;
 
-            case 3:
+            case _AT_GRP_ID:
                 grp_id[0] = 0x01;
                 grp_id[1] = 0x35;
                 grp_id[2] = 0x46;
-                cmd_id = 4;
+                cmd_id = _AT_FBND;
                 ipc_send_flag = 1;
                 break;
 
-            case 4:
+            case _AT_FBND:
                 rf_band = 3;
-                cmd_id = 5;
+                cmd_id = _AT_MADD;
                 ipc_send_flag = 1;
                 break;
 
-            case 5:
+            case _AT_MADD:
                 mod_address = 0;
-                cmd_id = 6;
+                cmd_id = _AT_CHN;
                 ipc_send_flag = 1;
                 break;
 
-            case 6:
+            case _AT_CHN:
                 rf_channel = 5;
-                cmd_id = 7;
+                cmd_id = _AT_BCST;
                 ipc_send_flag = 1;
                 break;
 
-            case 7:
+            case _AT_BCST:
                 bcst_status = 1;
-                cmd_id = 8;
+                cmd_id = _AT_DRATE;
                 ipc_send_flag = 1;
                 break;
 
-            case 8:
+            case _AT_DRATE:
                 data_rate = 2;
-                cmd_id = 9;
+                cmd_id = _AT_RNDCH;
                 ipc_send_flag = 1;
                 break;
 
-            case 9:
+            case _AT_RNDCH:
                 rand_channel = 0;
-                cmd_id = 11;
+                cmd_id = _AT_ID;
                 ipc_send_flag = 1;
                 break;
 
-            case 10:
+            case _AT_PAIR:
                 cmd_id = 19;
                 cmd_state = 19;
                 ipc_send_flag = 0;
                 pair_status = 1;
                 break;
 
-            case 11:
+            case _AT_ID:
                 {
                     int i = 0;
 
@@ -995,7 +995,7 @@ int check_uart (PBYTE data_buf)
 
                         printf("device_id[%d] = %x  \n", i, dev_id[i]);
                     }
-                    cmd_id = 10;
+                    cmd_id = _AT_PAIR;
                     ipc_send_flag = 1;
                 }
                 break;
@@ -1005,7 +1005,7 @@ int check_uart (PBYTE data_buf)
                 break;
         }
     }
-    else if(cmd_state == 11)
+    else if(cmd_state == _AT_ID)
     {
         int i = 0;
         
@@ -1015,10 +1015,10 @@ int check_uart (PBYTE data_buf)
         
             printf("device_id[%d] = %x    \n", i, dev_id[i]);
         }
-        cmd_id = 10;
+        cmd_id = _AT_PAIR;
         ipc_send_flag = 1;
     }
-    else if(cmd_state == 13)
+    else if(cmd_state == _AT_LST_ID)
     {
         char* token = NULL;
         char div[] = ",\r\n";
@@ -1055,7 +1055,7 @@ int check_uart (PBYTE data_buf)
                 printf("device[%d] addr = %d, id = [%x %x %x]\n", it, devices[it].dev_addr, devices[it].dev_id[0], devices[it].dev_id[1], devices[it].dev_id[2]);
             }
 
-            cmd_id = 12;
+            cmd_id = _AT_RST;
             rst_status = 1;
             list_end = 0;
             data_status = 0;
@@ -1172,8 +1172,9 @@ int rf_data_parser(PBYTE data_buf)
     memcpy(packetbuf+ 12, enc_out, encslength);
 
     ipc_send_flag = 1;
-    memcpy(cmd_buffer+ 14, packetbuf, MAX_PACKET_BUFFER);
-    cmd_id = 14;
+
+    sprintf(cmd_buffer[_AT_USER_CMD], "%s\r\n", packetbuf);
+    cmd_id = _AT_USER_CMD;
 }
 
 BYTE* hex_decode(char *in, int len, BYTE *out)
@@ -1190,11 +1191,6 @@ BYTE* hex_decode(char *in, int len, BYTE *out)
     }
     return out;
 }
-/*
-RDY SW:CD06.0
-BAND:3,CHN:0,DRATE:2,MODE:0
-UNPAIRED
-*/
 
 int parse_data (PBYTE data_buf, int *cnt)
 {
@@ -1204,7 +1200,7 @@ int parse_data (PBYTE data_buf, int *cnt)
     {
         memmove(&data_buf[0], &data_buf[2], MAX_PACKET_BUFFER - 2);
         *cnt -= 2;
-        if(list_end == 0 && cmd_state == 13)
+        if(list_end == 0 && cmd_state == _AT_LST_ID)
         {
             list_end = 1;
             return 1;
@@ -1218,9 +1214,9 @@ int parse_data (PBYTE data_buf, int *cnt)
     }
 
     printf("parse_data ===> cmd_state[%d], index[%d]\n", cmd_state, index);
-    if(cmd_state != -1 && cmd_state != 0)
+    if(cmd_state != -1 && cmd_state != _AT_START)
     {
-        if(cmd_state == 12)
+        if(cmd_state == _AT_RST)
         {
             if(index >= 3)
             {

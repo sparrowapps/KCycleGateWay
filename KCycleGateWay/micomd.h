@@ -94,6 +94,24 @@ Content-Type: application/json\n\
 {\"data\":\"01020304050607080910111213141516171819202122232425\"}\
 "
 
+typedef enum AT_CMD_type {
+    _AT_START = 0,
+    _AT_ACODE = 1,
+    _AT_MODE  = 2,
+    _AT_GRP_ID = 3,
+    _AT_FBND  = 4,
+    _AT_MADD  = 5,
+    _AT_CHN   = 6, 
+    _AT_BCST  = 7,
+    _AT_DRATE = 8,
+    _AT_RNDCH = 9,
+    _AT_PAIR  = 10,
+    _AT_ID    = 11,
+    _AT_RST   = 12,
+    _AT_LST_ID = 13,
+    _AT_USER_CMD = 14,
+};
+
 
 
 int create_socket (int portnum);
