@@ -131,5 +131,11 @@ int decrypt_block(unsigned char* plainText, unsigned char* cipherText, unsigned 
 int ssl_write(unsigned char * msg, unsigned char ** outmsg, int * outmsglen);
 int init_wiringPi();
 int open_uart();
+
+//packet
+void make_packet(char code, char subcode, char * senderid, short pn, char len, char * value, unsingend char ** out_packet);
+int validate_ac();
+void make_ac_code(char * senderid, short pn, unsigned char ** out_ac);
+
 #endif /* _MICOM_H_ */
 

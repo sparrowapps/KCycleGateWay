@@ -1144,8 +1144,8 @@ int rf_data_parser(PBYTE data_buf)
     ac[2] = 0x01;
     
     // packet num memcpy로?
-    ac[3] = packetnum % 8;
-    ac[4] = packetnum / 8;
+    ac[3] = packetnum % 256;
+    ac[4] = packetnum / 256;
 
     memset(enc_out, 0, sizeof(enc_out));
     memset(dec_out, 0, sizeof(dec_out));
@@ -1162,7 +1162,7 @@ int rf_data_parser(PBYTE data_buf)
 
     unsigned char * plText = "PING MSG";
     memset(enc_out, 0, sizeof(enc_out));
-    encslength = encrypt_block(enc_out, ac, 5, Key, IV);
+    encslength = encrypt_block(enc_out, plText, strlen(plText), Key, IV);
 
     unsigned char packetbuf[MAX_PACKET_BUFFER];
     packetbuf[0] = code;
@@ -1176,6 +1176,78 @@ int rf_data_parser(PBYTE data_buf)
     sprintf(cmd_buffer[_AT_USER_CMD], "%s\r\n", packetbuf);
     cmd_id = _AT_USER_CMD;
 }
+
+void make_packet(char code, char subcode, char * senderid, short pn, char len, char * value, unsingend char ** out_packet)
+{
+    unsigned char packetbuf[MAX_PACKET_BUFFER];
+    packetbuf[0] = code;
+    packetbuf[1] = subcode;
+    
+    unsigned char * ac;
+
+    unsigned char enc_out[1000];
+
+    unsigned char * buf;
+
+    memset(enc_out, 0x00, sizeof(enc_out));
+
+    make_ac_code(senderid, pn, &ac); //ac 는 free 해야 한다.
+
+    memcpy(packetbuf + 2, ac, 10);
+
+    int encslength = encrypt_block(enc_out, value, (int)len, Key, IV);
+    packetbuf[12] = encslength;
+    memcmp(packetbuf + 12, enc_out, encslength);
+
+    buf = malloc(MAX_PACKET_BUFFER);
+    *out_packet = buf;
+}
+
+// AC 코드 확인
+int validate_ac()
+{
+
+}
+
+// AC 코드 생성
+// short = byte[1] << 8 | byte[0] 
+void make_ac_code(char * senderid, short pn, unsigned char ** out_ac)
+{
+    unsigned char ac[10];
+    unsigned char * buf;
+    ac[0] = (unsigned char)senderid;
+    ac[1] = (unsigned char)senderid + 1;
+    ac[2] = (unsigned char)senderid + 2;
+    ac[3] = packetnum % 256;
+    ac[4] = packetnum / 256;
+
+    unsigned char digest[SHA256_DIGEST_LENGTH];
+    unsigned char enc_out[1000];
+    unsigned char dec_out[1000];
+    unsigned char enc_temp[1000];
+
+    memset(enc_out, 0x00, sizeof(enc_out));
+    memset(dec_out, 0x00, sizeof(dec_out));
+    memset(enc_temp, 0x00, sizeof(enc_temp));
+    memset(digest, 0x00, sizeof(digest));
+
+    int encslength = encrypt_block(enc_out, ac, 5, Key, IV);
+
+    SHA256_CTX ctx;
+    SHA256_Init(&ctx);
+    SHA256_Update(&ctx, enc_out, encslength);
+    SHA256_Final(digest, &ctx);
+
+    memcpy(ac + 5, digest + 27, 5);
+
+    buf = malloc(10);
+    memcpy(buf, ac, sizeof(ac));
+
+    *out_ac = buf;
+}
+
+
+
 
 BYTE* hex_decode(char *in, int len, BYTE *out)
 {

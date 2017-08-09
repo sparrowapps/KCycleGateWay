@@ -407,6 +407,8 @@ static void http_write(const char *msg, int fd) {
             message->message_txt = buf;
             message_queue_write(&https_queue, message);  
         }
+
+        free(outmsg);
     }    
 }
 
