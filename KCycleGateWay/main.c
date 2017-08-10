@@ -55,14 +55,14 @@ static void handle_uart_data(int fd);
 static void handle_uart_request(int fd, char *request);
 static void handle_socket_data(int fd);
 static void handle_socket_request(int fd, char *request);
-static void uart_write(int fd, const char *msg);
-static void http_write(const char *msg, int fd);
+static void uart_write(int fd, char *msg);
+static void http_write( char *msg, int fd);
 
 // Message queue related code
 
 struct gateway_op {
     enum { OP_WRITE_UART, OP_WRITE_HTTP, OP_READ_SOCKET, OP_READ_UART, OP_EXIT } operation;
-    const char *message_txt; //
+    char *message_txt; //
     int socketfd;  //소켓 클라이언트
     int uartfd;    //uart
 
@@ -307,7 +307,7 @@ static void handle_uart_data(int fd) {
 extern int list_end;
 extern int cmd_state;
 extern int data_status;
-extern fd_masks[MAX_SOCKET_FD];
+extern int fd_masks[MAX_SOCKET_FD];
 extern unsigned char cmd_buffer[MAX_CMD][MAX_PACKET_BUFFER];
 extern int cmd_id;
 extern int ipc_send_flag;
@@ -375,11 +375,11 @@ static void handle_uart_request(int fd, char *request) {
     }
 }
 
-static void uart_write(int fd, const char *msg) {
+static void uart_write(int fd,  char *msg) {
     int r = write_packet(fd, msg, strlen(msg));
 }
 
-static void http_write(const char *msg, int fd) {
+static void http_write( char *msg, int fd) {
     int outmsglen = 0;
     unsigned char * outmsg = NULL;
     int r = ssl_write( msg, &outmsg, &outmsglen );

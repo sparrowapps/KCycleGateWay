@@ -1104,7 +1104,7 @@ int rf_data_parser(PBYTE data_buf)
     printf ("sender id %02x, %02x, %02x\n", senderid[0], senderid[1], senderid[2]);
     unsigned short pn = 0;
     pn = packetnumber[1] << 8 +  packetnumber[0];
-    printf ("packet num %d\n", (short)packetnumber );
+    printf ("packet num %d\n", pn );
 
     unsigned char digest[SHA256_DIGEST_LENGTH];
     unsigned char enc_out[1000];
@@ -1177,7 +1177,7 @@ int rf_data_parser(PBYTE data_buf)
     cmd_id = _AT_USER_CMD;
 }
 
-void make_packet(char code, char subcode, char * senderid, short pn, char len, char * value, unsingend char ** out_packet)
+void make_packet(char code, char subcode, char * senderid, short pn, char len, char * value, unsigned char ** out_packet)
 {
     unsigned char packetbuf[MAX_PACKET_BUFFER];
     packetbuf[0] = code;
@@ -1215,11 +1215,15 @@ void make_ac_code(char * senderid, short pn, unsigned char ** out_ac)
 {
     unsigned char ac[10];
     unsigned char * buf;
-    ac[0] = (unsigned char)senderid;
-    ac[1] = (unsigned char)senderid + 1;
-    ac[2] = (unsigned char)senderid + 2;
-    ac[3] = packetnum % 256;
-    ac[4] = packetnum / 256;
+
+    unsigned char senderidbuf[3];
+    memcpy(senderidbuf, senderid, sizeof(senderidbuf));
+
+    ac[0] = (unsigned char)senderidbuf[0];
+    ac[1] = (unsigned char)senderidbuf[1];
+    ac[2] = (unsigned char)senderidbuf[2];
+    ac[3] = pn % 256;
+    ac[4] = pn / 256;
 
     unsigned char digest[SHA256_DIGEST_LENGTH];
     unsigned char enc_out[1000];
@@ -1353,7 +1357,7 @@ int get_max_fd (int a, int b, int c) {
 }
 
 
-int write_packet (int fd, const PBYTE pbuf, int size) {
+int write_packet (int fd, PBYTE pbuf, int size) {
     int wrtsize = 0;
     int it = 0;
     char msg[100] = {0, };

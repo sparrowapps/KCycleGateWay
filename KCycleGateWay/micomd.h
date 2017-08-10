@@ -94,7 +94,7 @@ Content-Type: application/json\n\
 {\"data\":\"01020304050607080910111213141516171819202122232425\"}\
 "
 
-typedef enum AT_CMD_type {
+typedef enum AT_CMD {
     _AT_START = 0,
     _AT_ACODE = 1,
     _AT_MODE  = 2,
@@ -110,7 +110,7 @@ typedef enum AT_CMD_type {
     _AT_RST   = 12,
     _AT_LST_ID = 13,
     _AT_USER_CMD = 14,
-};
+} AT_CMD_TYPE;
 
 
 
@@ -124,7 +124,7 @@ BYTE* hex_decode(char *in, int len, BYTE *out);
 int parse_data (PBYTE data_buf, int *cnt);
 int get_max_fd (int a, int b, int c);
 void send_socket_control_data(PBYTE data_buf, int length);
-int write_packet (int fd,const PBYTE pbuf, int size);
+int write_packet (int fd, PBYTE pbuf, int size);
 int extract_packet (int cnt, PBYTE buf);
 int encrypt_block(unsigned char* cipherText, unsigned char* plainText, unsigned int plainTextLen, unsigned char* key, unsigned char* ivec);
 int decrypt_block(unsigned char* plainText, unsigned char* cipherText, unsigned int cipherTextLen, unsigned char* key, unsigned char* ivec);
@@ -132,8 +132,12 @@ int ssl_write(unsigned char * msg, unsigned char ** outmsg, int * outmsglen);
 int init_wiringPi();
 int open_uart();
 
+int del_socket(int fd);
+int mk_fds(fd_set *fds, int fd_max);
+int add_socket(int fd);
+
 //packet
-void make_packet(char code, char subcode, char * senderid, short pn, char len, char * value, unsingend char ** out_packet);
+void make_packet(char code, char subcode, char * senderid, short pn, char len, char * value, unsigned char ** out_packet);
 int validate_ac();
 void make_ac_code(char * senderid, short pn, unsigned char ** out_ac);
 
