@@ -112,7 +112,54 @@ typedef enum AT_CMD {
     _AT_USER_CMD = 14,
 } AT_CMD_TYPE;
 
+#define PACKET_CMD_PING_R           0x01
+#define PACKET_CMD_PING_S           0x02
 
+#define PACKET_CMD_INSPECTION_R     0x03
+#define PACKET_CMD_INSPECTION_S     0x04
+
+#define PACKET_CMD_ENCKEYREQMSG_R   0x05
+#define PACKET_CMD_ENCKEYREQMSG_S   0x06
+
+#define PACKET_CMD_ENCKEYRESMSG_R   0x07
+#define PACKET_CMD_ENCKEYREQMSG_S   0x08
+
+#define PACKET_CMD_LOGCHK_R         0x09
+#define PACKET_CMD_LOGCHK_S         0x0A
+
+#define PACKET_CMD_PAIRINGINFO_R    0x0B
+#define PACKET_CMD_PAIRINGINFO_S    0x0C
+
+#define PACKET_CMD_ERRORCHK_R       0x0D
+#define PACKET_CMD_ERRORCHK_S       0x0E
+
+#define PACKET_CMD_TRAININGSTART_R  0x10
+#define PACKET_CMD_TRAININGSTART_S  0x11
+
+#define PACKET_CMD_TRAININGSTOP_R   0x12
+#define PACKET_CMD_TRAININGSTOP_S   0x13
+
+#define PACKET_CMD_DASHSTART_R      0x14
+#define PACKET_CMD_DASHSTART_S      0x15
+
+#define PACKET_CMD_DASHSTOP_R       0x16
+#define PACKET_CMD_DASHSTOP_S       0x17
+
+#define PACKET_CMD_DASHRESULT_R     0x18
+#define PACKET_CMD_DASHRESULT_S     0x19
+
+#define PACKET_CMD_RACESTATECHK_R   0x30
+#define PACKET_CMD_RACESTATECHK_S   0x31
+#define PACKET_CMD_RACESTATECHK2_R  0x32
+
+#define PACKET_CMD_RACESTARTTIME_R  0x33
+#define PACKET_CMD_RACESTARTTIME_S  0x34
+
+#define PACKET_CMD_RACELINERESULT_R 0x35
+#define PACKET_CMD_RACELINERESULT_S 0x36
+
+#define PACKET_CMD_RACECYCLESULT_R  0x37
+#define PACKET_CMD_RACECYCLESULT_S  0x38
 
 int create_socket (int portnum);
 int read_packet (int fd, int cnt, PBYTE buf, int fd_index);
@@ -125,7 +172,7 @@ int parse_data (PBYTE data_buf, int *cnt);
 int get_max_fd (int a, int b, int c);
 void send_socket_control_data(PBYTE data_buf, int length);
 int write_packet (int fd, PBYTE pbuf, int size);
-int extract_packet (int cnt, PBYTE buf);
+
 int encrypt_block(unsigned char* cipherText, unsigned char* plainText, unsigned int plainTextLen, unsigned char* key, unsigned char* ivec);
 int decrypt_block(unsigned char* plainText, unsigned char* cipherText, unsigned int cipherTextLen, unsigned char* key, unsigned char* ivec);
 int ssl_write(unsigned char * msg, unsigned char ** outmsg, int * outmsglen);
@@ -138,8 +185,12 @@ int add_socket(int fd);
 
 //packet
 void make_packet(char code, char subcode, char * senderid, short pn, char len, char * value, unsigned char ** out_packet);
-int validate_ac();
+int validate_ac(char * senderid, short pn, unsigned char * acbuf);
 void make_ac_code(char * senderid, short pn, unsigned char ** out_ac);
+char * hexbuf2buf(const char * hexbuf);
+int hex2val(const char ch);
 
+int extract_packet (unsigned char * inputpacket, char * outcode, char * outsubcode, char * outsenderid, short * outpn, char * outlen, char ** outvalue);
+void aestest();
 #endif /* _MICOM_H_ */
 

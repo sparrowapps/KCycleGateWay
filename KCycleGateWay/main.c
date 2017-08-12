@@ -50,6 +50,8 @@ gateway                     서버
 
 #include "logger.h"
 
+#include "base64.h"
+
 // function prototype
 static void handle_uart_data(int fd);
 static void handle_uart_request(int fd, char *request);
@@ -420,6 +422,13 @@ void init_uart_data() {
 
 // main fd select
 int main(int argc, char *argv[]) {
+    // e7 47 00 f5 64 : 69 ed c1 6b 70
+    // input  10 00 27 01 00
+    // output e7 47 00 f5 64
+
+    aestest();
+    
+
     main_thread = pthread_self();
     threads_init();
 

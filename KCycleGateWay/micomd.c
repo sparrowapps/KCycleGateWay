@@ -26,6 +26,7 @@
 #include "wiringPi.h"
 #include "ssltest.h"
 #include "logger.h"
+#include "base64.h"
 
 #define RST 9
 #define PIO 7
@@ -763,19 +764,35 @@ int check_rf_data(PBYTE data_buf)
             printf("token = %s\n", token);
             if(check_addr == 0)
             {
+                LOG_DEBUG("token = %s\n", token);
                 addr = atoi(token);
                 check_addr = 1;
             }
-            else if(memcmp(token, PING_CHECK, 4) == 0)
-            {
-                cmd_id = _AT_USER_CMD;
-                sprintf(cmd_buffer[14], "%d,ping\r\n", addr);
-                ipc_send_flag = 1;
+            else {
+                LOG_DEBUG("token = %s\n", token);
+                if(memcmp(token, PING_CHECK, 4) == 0)
+                {
+                    LOG_DEBUG("token = %s\n", token);
+                    cmd_id = _AT_USER_CMD;
+                    sprintf(cmd_buffer[14], "%d,ping\r\n", addr);
+                    ipc_send_flag = 1;
+                }
+                else
+                {
+                    LOG_DEBUG("token = %s\n", token);
+                    // 0100EF000001008505039C01106E950D2C3D178C051136BA50F51BE283
+                    unsigned char base_decode[MAX_PACKET_BUFFER];
+                    memset(base_decode, 0x00, sizeof(base_decode));
+
+                    printf("RF data : %s\n",token);
+                    base64_decode(token, strlen(token) , base_decode);
+
+                    printf("base64 decode %02X , %02x\n", base_decode[0], base_decode[1]); 
+
+                    rf_data_parser(base_decode);
+                }
             }
-            else
-            {
-                rf_data_parser(data_buf);
-            }
+            
 
             token = strtok(NULL, div);
         }
@@ -1068,6 +1085,42 @@ int check_uart (PBYTE data_buf)
     return 0;
 }
 
+void aestest()
+{
+    // : 69 ed c1 6b 70
+    //output e7 47 00 f5 64
+    unsigned char ac[] = {0x10, 0x00, 0x27, 0x01, 0x00};
+
+    unsigned char digest[SHA256_DIGEST_LENGTH];
+    unsigned char enc_out[1000];
+    unsigned char dec_out[1000];
+    unsigned char enc_temp[1000];
+
+    memset(digest, 0, sizeof(digest));
+    memset(enc_out, 0, sizeof(enc_out));
+    memset(dec_out, 0, sizeof(dec_out));
+    memset(enc_temp, 0, sizeof(enc_temp));
+
+    //int enc_pad = 16 - (5 % 16);
+    //memset(enc_temp, enc_pad, (5+enc_pad));
+    //memcpy(enc_temp, ac, 5);
+
+    int encslength = encrypt_block(enc_out, ac, 5, Key, IV);
+    LOG_DEBUG ("encslength : %d ", encslength  );
+    SHA256_CTX ctx;
+    SHA256_Init(&ctx);
+    SHA256_Update(&ctx, enc_out, 16);
+    SHA256_Final(digest, &ctx);
+
+    LOG_DEBUG ("%02x %02x %02x %02x %02x",digest[27],digest[28],digest[29],digest[30],digest[31]  );
+
+    for (int i=0; i<32; i++){
+        printf( " %02X ", digest[i]);
+    }
+
+    LOG_DEBUG ("===============================================================\n\n\n\n");
+}
+
 int rf_data_parser(PBYTE data_buf)
 {
     unsigned char *p;
@@ -1077,10 +1130,12 @@ int rf_data_parser(PBYTE data_buf)
     unsigned char ac[10];
     unsigned char senderid[3];
     unsigned char packetnumber[2]; //2byte int
+
+    unsigned char * encbuf;
     
 
-    printf ("code %02X", code);
-    printf ("subcode %02X", subcode);
+    printf ("code %02X\n", code);
+    printf ("subcode %02X\n", subcode);
 
     p = p + 2;
     memcpy(ac, p, 10);
@@ -1103,8 +1158,9 @@ int rf_data_parser(PBYTE data_buf)
 
     printf ("sender id %02x, %02x, %02x\n", senderid[0], senderid[1], senderid[2]);
     unsigned short pn = 0;
-    pn = packetnumber[1] << 8 +  packetnumber[0];
-    printf ("packet num %d\n", pn );
+    pn = (short)(packetnumber[1] << 8) +  (short)(packetnumber[0]);
+    LOG_DEBUG ("packet num %d %d\n", packetnumber[0], packetnumber[1]);
+    LOG_DEBUG ("packet num %d\n", pn );
 
     unsigned char digest[SHA256_DIGEST_LENGTH];
     unsigned char enc_out[1000];
@@ -1115,12 +1171,20 @@ int rf_data_parser(PBYTE data_buf)
     memset(dec_out, 0, sizeof(dec_out));
     memset(enc_temp, 0, sizeof(enc_temp));
 
+    int enc_pad = 16 - (5 % 16);
+    memset(enc_temp, enc_pad, (5+enc_pad));
+    memcpy(enc_temp, ac, 5);
+
     int encslength = encrypt_block(enc_out, ac, 5, Key, IV);
+    LOG_DEBUG ("encslength : %d ", encslength  );
     SHA256_CTX ctx;
     SHA256_Init(&ctx);
     SHA256_Update(&ctx, enc_out, encslength);
     SHA256_Final(digest, &ctx);
 
+
+    LOG_DEBUG ("%02x %02x %02x %02x %02x",ac[0],ac[1],ac[2],ac[3],ac[4]);
+    LOG_DEBUG ("%02x %02x %02x %02x %02x : %02x %02x %02x %02x %02x",ac[5],ac[6],ac[7],ac[8],ac[9], digest[27],digest[28],digest[29],digest[30],digest[31]  );
     if ( memcmp(ac + 5, digest + 27, 5) != 0 ) {
         printf("ac code fail\n");
         return 0;
@@ -1129,7 +1193,7 @@ int rf_data_parser(PBYTE data_buf)
     // value decrypt
     int decslength = decrypt_block(dec_out, value, (int)len, Key, IV);
     memcpy(plaintextValue, dec_out, decslength);
-    printf("plaintext :%s", plaintextValue);
+    printf("plaintext :%s\n", plaintextValue);
 
     // 내 아이디를 얻어 놔야 한다.
 
@@ -1177,6 +1241,76 @@ int rf_data_parser(PBYTE data_buf)
     cmd_id = _AT_USER_CMD;
 }
 
+int packet_process(unsigned char * inputpacket)
+{
+    char code;
+    char subcode;
+    char senderid[3];
+    short pn;
+    char len;
+    unsigned char * valuebuf;
+    unsigned char * outpacket;
+
+    if ( extract_packet(inputpacket, &code, &subcode, senderid, &pn, &len, &valuebuf) == 0 ){
+        switch (code)
+        {
+            case PACKET_CMD_PING_R:
+            //todo 내 senderid 를 만들어야 한다.
+                senderid[0] = 0x00;
+                senderid[1] = 0x00;
+                senderid[2] = 0x01;
+                make_packet(code + 1, 0x00, senderid, 0, 5, "HELLO", &outpacket);
+                
+                ipc_send_flag = 1;
+
+                sprintf(cmd_buffer[_AT_USER_CMD], "%s\r\n", outpacket);
+                cmd_id = _AT_USER_CMD;
+                break;
+            default:
+                //nothing todo
+                break;
+        }
+
+    }
+
+    return 0;
+
+}
+
+
+// 입력 받은 패킷을 분해 한다.
+int extract_packet (unsigned char * inputpacket, char * outcode, char * outsubcode, char * outsenderid, short * outpn, char * outlen, char ** outvalue)
+{
+    unsigned char dec_out[1000];
+    unsigned char *outbuf = NULL;
+
+    outcode[0] = inputpacket[0];
+    outsubcode[0] = inputpacket[1];
+    
+    outsenderid[0] = inputpacket[2];
+    outsenderid[1] = inputpacket[3];
+    outsenderid[2] = inputpacket[4];
+
+    *outpn = inputpacket[5] + inputpacket[6] << 8;
+
+    if (validate_ac(inputpacket + 2, *outpn, inputpacket + 7) == 0){
+        *outlen = inputpacket + 12;
+        
+        //plaintext
+        int decslength = decrypt_block(dec_out, inputpacket + 13, *outlen, Key, IV);
+        outbuf = malloc(decslength);
+        memcpy(outbuf, dec_out, decslength);
+        printf("plaintext :%s\n", outbuf);
+
+        *outvalue = outbuf;
+
+        return 0;
+    } else {
+        return -1;
+    }
+    
+}
+
 void make_packet(char code, char subcode, char * senderid, short pn, char len, char * value, unsigned char ** out_packet)
 {
     unsigned char packetbuf[MAX_PACKET_BUFFER];
@@ -1204,9 +1338,16 @@ void make_packet(char code, char subcode, char * senderid, short pn, char len, c
 }
 
 // AC 코드 확인
-int validate_ac()
+int validate_ac(char * senderid, short pn, unsigned char * acbuf)
 {
+    unsigned char * ac;
+    make_ac_code(senderid, pn, &ac); //ac 는 free 해야 한다.
 
+    if ( memcmp(ac, acbuf, 10) == 0 ) {
+        return 0;
+    } else {
+        return -1;
+    }
 }
 
 // AC 코드 생성
@@ -1375,31 +1516,7 @@ int write_packet (int fd, PBYTE pbuf, int size) {
     }
 }
 
-// extract the normal packet after the packet error
-int extract_packet (int cnt, PBYTE buf)
-{
-#if 0
-    int index;
-    int temp_index;
-    int temp_cnt = 0;
-    int flag = 0;
 
-    for (index = 1; index < cnt; index++) {
-        if (buf[index] == HEADER) {
-            temp_cnt = index;
-            memmove(&buf[0], &buf[temp_cnt], cnt - temp_cnt);
-
-            cnt -= temp_cnt;
-            flag = 1;
-            break;
-        }
-    }
-    if (flag == 0) {
-        cnt = 0;
-    }
-#endif
-    return cnt;
-}
 
 /* AES Encrypt Process */
 int encrypt_block(unsigned char* cipherText, unsigned char* plainText, unsigned int plainTextLen, unsigned char* key, unsigned char* ivec)
@@ -1474,3 +1591,32 @@ int decrypt_block(unsigned char* plainText, unsigned char* cipherText, unsigned 
     return toLen+outLen;
 }
 
+
+int hex2val(const char ch)
+{
+    if (ch >= '0' && ch <= '9')
+        return ch - '0';  /* Simple ASCII arithmetic */
+    else if (ch >= 'a' && ch <= 'f')
+        return 10 + ch - 'a';  /* Because hex-digit a is ten */
+    else if (ch >= 'A' && ch <= 'F')
+        return 10 + ch - 'A';  /* Because hex-digit A is ten */
+    else
+        return -1;  /* Not a valid hexadecimal digit */
+}
+
+char * hexbuf2buf(const char * hexbuf)
+{
+    unsigned char * resbuf;
+    resbuf = malloc(strlen(hexbuf) / 2);
+    for (size_t i = 0, j = 0; i< strlen(hexbuf); i +=2, ++j) {
+        int digit1 = hex2val(hexbuf[i]);
+        int digit2 = hex2val(hexbuf[i + 1]);
+
+        if (digit1 == -1 || digit2 == -1)
+            continue;
+
+        resbuf[j] = (char) (digit1 * 16 + digit2);
+    }
+
+    return resbuf;
+}
