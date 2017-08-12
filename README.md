@@ -45,6 +45,29 @@ enable_uart=1
 ~~~
 추가
 
+## file system 확장
+~~~
+sudo rasp-config
+~~~
+
+Advanced Options --> A1 Expand Filesystem
+
+reboot
+
+
+확인
+~~~
+pi@raspberrypi:~ $ df -h
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/root       7.3G  1.3G  5.7G  19% /
+devtmpfs        458M     0  458M   0% /dev
+tmpfs           462M     0  462M   0% /dev/shm
+tmpfs           462M  6.6M  456M   2% /run
+tmpfs           5.0M  4.0K  5.0M   1% /run/lock
+tmpfs           462M     0  462M   0% /sys/fs/cgroup
+/dev/mmcblk0p1   42M   21M   21M  51% /boot
+~~~
+
 ## git 설치
 ~~~
 sudo apt-get install git
@@ -97,28 +120,7 @@ public = yes
 sudo /etc/init.d/samba restart
 ~~~
 
-## file system 확장
-~~~
-sudo rasp-config
-~~~
 
-Advanced Options --> A1 Expand Filesystem
-
-reboot
-
-
-확인
-~~~
-pi@raspberrypi:~ $ df -h
-Filesystem      Size  Used Avail Use% Mounted on
-/dev/root       7.3G  1.3G  5.7G  19% /
-devtmpfs        458M     0  458M   0% /dev
-tmpfs           462M     0  462M   0% /dev/shm
-tmpfs           462M  6.6M  456M   2% /run
-tmpfs           5.0M  4.0K  5.0M   1% /run/lock
-tmpfs           462M     0  462M   0% /sys/fs/cgroup
-/dev/mmcblk0p1   42M   21M   21M  51% /boot
-~~~
 
 ## jansson 설치
 ~~~
