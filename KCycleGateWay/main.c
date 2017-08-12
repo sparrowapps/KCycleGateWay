@@ -51,6 +51,7 @@ gateway                     서버
 #include "logger.h"
 
 #include "base64.h"
+#include <jansson.h>
 
 // function prototype
 static void handle_uart_data(int fd);
@@ -420,14 +421,17 @@ void init_uart_data() {
     }
 }
 
+void jason_parse_test() ;
 // main fd select
 int main(int argc, char *argv[]) {
     // e7 47 00 f5 64 : 69 ed c1 6b 70
     // input  10 00 27 01 00
     // output e7 47 00 f5 64
 
-    aestest();
-    
+    //aestest();
+
+    jason_parse_test();
+
 
     main_thread = pthread_self();
     threads_init();
@@ -542,3 +546,29 @@ int main(int argc, char *argv[]) {
 // Accept-Encoding: gzip, deflate, sdch, br
 // Accept-Language: ko-KR,ko;q=0.8,en-US;q=0.6,en;q=0.4
 // Cookie: JSESSIONID=5EBE4E35EBC10452C92EC291149B798F
+
+
+void jason_parse_test() 
+{
+    json_t* pjson;
+    json_t* data;
+    int i;
+    char* result;
+    LOG_DEBUG("janson");
+    pjson = json_array();
+    LOG_DEBUG("janson");
+    json_array_append(pjson, json_integer(42));
+    LOG_DEBUG("janson");
+    json_array_append(pjson, json_integer(42));
+    LOG_DEBUG("janson");
+    json_array_append(pjson, json_integer(42));
+    LOG_DEBUG("janson");
+ 
+    printf("size : %d\n", json_array_size(pjson));
+    result = json_dumps(pjson, JSON_ENCODE_ANY);
+    json_dump_file(pjson, "./data.json", JSON_ENCODE_ANY);
+    printf("%s\n", result);
+ 
+    json_decref(pjson);
+
+}

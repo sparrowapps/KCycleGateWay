@@ -120,7 +120,11 @@ tmpfs           462M     0  462M   0% /sys/fs/cgroup
 /dev/mmcblk0p1   42M   21M   21M  51% /boot
 ~~~
 
-
+## jansson 설치
+~~~
+sudo apt-get install libjansson-dev
+sudo ldconfig
+~~~
 
 
 ## 디버거 nemiver GDB frontend
