@@ -4,21 +4,24 @@ C_SRCS += \
 ../message_queue.c \
 ../micomd.c \
 ../ssltest.c \
-../uart.c 
+../uart.c \
+../base64.c
 
 OBJS += \
 ./main.o \
 ./message_queue.o \
 ./micomd.o \
 ./ssltest.o \
-./uart.o 
+./uart.o \
+./base64.o
 
 C_DEPS += \
 ./main.d \
 ./message_queue.d \
 ./micomd.d \
 ./ssltest.d \
-./uart.d 
+./uart.d \
+./base64.d
 
 # Each subdirectory must supply rules for building sources it contributes
 %.o: ../%.c

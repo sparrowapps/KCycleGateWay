@@ -271,3 +271,5 @@ KCycleGateWay/build/ssltest.o
 KCycleGateWay/build/uart.d
 KCycleGateWay/build/uart.o
 ._.DS_Store
+KCycleGateWay/build/base64.d
+KCycleGateWay/build/base64.o
