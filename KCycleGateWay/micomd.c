@@ -1,4 +1,5 @@
  
+#include "main.h"
 #include <fcntl.h>
 #include <limits.h>
 #include <stdio.h>
@@ -1251,6 +1252,12 @@ int packet_process(unsigned char * inputpacket)
     unsigned char * valuebuf;
     unsigned char * outpacket;
 
+    valuebuf = malloc(MAX_PACKET_BYTE);
+    memset(valuebuf, 0x00, MAX_PACKET_BYTE);
+    int outpacketlen = 0;
+
+    
+
     if ( extract_packet(inputpacket, &code, &subcode, senderid, &pn, &len, &valuebuf) == 0 ){
         switch (code)
         {
@@ -1259,11 +1266,16 @@ int packet_process(unsigned char * inputpacket)
                 senderid[0] = 0x00;
                 senderid[1] = 0x00;
                 senderid[2] = 0x01;
-                make_packet(code + 1, 0x00, senderid, 0, 5, "HELLO", &outpacket);
-                
+
+                outpacket = malloc(MAX_PACKET_BUFFER);
+                memset(outpacket, 0x00, MAX_PACKET_BUFFER);
+                outpacketlen = 0;
+                make_packet(code + 1, 0x00, senderid, 0, 5, "HELLO", &outpacket, &outpacketlen);
+                unsigned char base_encode[MAX_PACKET_BUFFER];
+                base64_encode(outpacket, outpacketlen , base_encode);
                 ipc_send_flag = 1;
 
-                sprintf(cmd_buffer[_AT_USER_CMD], "%s\r\n", outpacket);
+                sprintf(cmd_buffer[_AT_USER_CMD], "%s\r\n", base_encode);
                 cmd_id = _AT_USER_CMD;
                 break;
             default:
@@ -1273,16 +1285,24 @@ int packet_process(unsigned char * inputpacket)
 
     }
 
+    free(valuebuf);
+
     return 0;
 
 }
 
 
 // 입력 받은 패킷을 분해 한다.
-int extract_packet (unsigned char * inputpacket, char * outcode, char * outsubcode, char * outsenderid, short * outpn, char * outlen, char ** outvalue)
+int extract_packet (unsigned char * inputpacket, 
+                    char * outcode, 
+                    char * outsubcode, 
+                    char * outsenderid, 
+                    short * outpn, 
+                    char * outlen, 
+                    unsigned char ** outvalue)
 {
     unsigned char dec_out[1000];
-    unsigned char *outbuf = NULL;
+    unsigned char outbuf[MAX_PACKET_BYTE];
 
     outcode[0] = inputpacket[0];
     outsubcode[0] = inputpacket[1];
@@ -1294,15 +1314,12 @@ int extract_packet (unsigned char * inputpacket, char * outcode, char * outsubco
     *outpn = inputpacket[5] + inputpacket[6] << 8;
 
     if (validate_ac(inputpacket + 2, *outpn, inputpacket + 7) == 0){
-        *outlen = inputpacket + 12;
+        *outlen = *(inputpacket + 12);
         
         //plaintext
         int decslength = decrypt_block(dec_out, inputpacket + 13, *outlen, Key, IV);
-        outbuf = malloc(decslength);
-        memcpy(outbuf, dec_out, decslength);
+        memcpy(*outvalue, dec_out, decslength);
         printf("plaintext :%s\n", outbuf);
-
-        *outvalue = outbuf;
 
         return 0;
     } else {
@@ -1311,41 +1328,48 @@ int extract_packet (unsigned char * inputpacket, char * outcode, char * outsubco
     
 }
 
-void make_packet(char code, char subcode, char * senderid, short pn, char len, char * value, unsigned char ** out_packet)
+void make_packet(char code, 
+                 char subcode, 
+                 char * senderid, 
+                 short pn, 
+                 char len, 
+                 char * value, 
+                 unsigned char ** out_packet,
+                 int * outlen)
 {
     unsigned char packetbuf[MAX_PACKET_BUFFER];
     packetbuf[0] = code;
     packetbuf[1] = subcode;
     
     unsigned char * ac;
-
     unsigned char enc_out[1000];
 
-    unsigned char * buf;
-
     memset(enc_out, 0x00, sizeof(enc_out));
-
-    make_ac_code(senderid, pn, &ac); //ac 는 free 해야 한다.
-
+    ac = malloc(10);
+    make_ac_code(senderid, pn, &ac);
     memcpy(packetbuf + 2, ac, 10);
+    free(ac);
 
+    //0 0 ac10 12:len
     int encslength = encrypt_block(enc_out, value, (int)len, Key, IV);
     packetbuf[12] = encslength;
-    memcmp(packetbuf + 12, enc_out, encslength);
-
-    buf = malloc(MAX_PACKET_BUFFER);
-    *out_packet = buf;
+    memcmp(packetbuf + 13, enc_out, encslength);
+    
+    memcpy(*out_packet, packetbuf, 13 + encslength);
 }
 
 // AC 코드 확인
 int validate_ac(char * senderid, short pn, unsigned char * acbuf)
 {
     unsigned char * ac;
-    make_ac_code(senderid, pn, &ac); //ac 는 free 해야 한다.
+    ac = malloc(10);
+    make_ac_code(senderid, pn, &ac);
 
     if ( memcmp(ac, acbuf, 10) == 0 ) {
+        free (ac);
         return 0;
     } else {
+        free(ac);
         return -1;
     }
 }
@@ -1355,8 +1379,6 @@ int validate_ac(char * senderid, short pn, unsigned char * acbuf)
 void make_ac_code(char * senderid, short pn, unsigned char ** out_ac)
 {
     unsigned char ac[10];
-    unsigned char * buf;
-
     unsigned char senderidbuf[3];
     memcpy(senderidbuf, senderid, sizeof(senderidbuf));
 
@@ -1384,15 +1406,8 @@ void make_ac_code(char * senderid, short pn, unsigned char ** out_ac)
     SHA256_Final(digest, &ctx);
 
     memcpy(ac + 5, digest + 27, 5);
-
-    buf = malloc(10);
-    memcpy(buf, ac, sizeof(ac));
-
-    *out_ac = buf;
+    memcpy(*out_ac, ac, sizeof(ac));
 }
-
-
-
 
 BYTE* hex_decode(char *in, int len, BYTE *out)
 {

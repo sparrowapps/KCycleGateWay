@@ -27,6 +27,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "main.h"
 #include "message_queue.h"
 #include <inttypes.h>
 #include <stdlib.h>
@@ -34,6 +35,7 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <errno.h>
+
 
 union padding {
     char chardata;

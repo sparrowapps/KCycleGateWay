@@ -184,13 +184,21 @@ int mk_fds(fd_set *fds, int fd_max);
 int add_socket(int fd);
 
 //packet
-void make_packet(char code, char subcode, char * senderid, short pn, char len, char * value, unsigned char ** out_packet);
+void make_packet(char code, 
+                 char subcode, 
+                 char * senderid, 
+                 short pn, 
+                 char len, 
+                 char * value, 
+                 unsigned char ** out_packet,
+                 int * outlen);
+
 int validate_ac(char * senderid, short pn, unsigned char * acbuf);
 void make_ac_code(char * senderid, short pn, unsigned char ** out_ac);
 char * hexbuf2buf(const char * hexbuf);
 int hex2val(const char ch);
 
-int extract_packet (unsigned char * inputpacket, char * outcode, char * outsubcode, char * outsenderid, short * outpn, char * outlen, char ** outvalue);
+int extract_packet (unsigned char * inputpacket, char * outcode, char * outsubcode, char * outsenderid, short * outpn, char * outlen, unsigned char ** outvalue);
 void aestest();
 #endif /* _MICOM_H_ */
 

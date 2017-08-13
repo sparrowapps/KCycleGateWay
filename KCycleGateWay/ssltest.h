@@ -9,7 +9,8 @@
                                  springboot를 사용한 tomcat과 test되었음
  ============================================================================
  */
-
+#include <fcntl.h> // for open
+#include <unistd.h> // for close
 #include <string.h>
 #include <netdb.h>
 #include <openssl/bio.h>

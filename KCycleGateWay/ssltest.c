@@ -9,7 +9,7 @@
                                  springboot를 사용한 tomcat과 test되었음
  ============================================================================
  */
-
+#include "main.h"
 #include "ssltest.h"
 
 int SSLOpenToServer(SSL_OPEN_TO_SERVER *sslOpenToServer, char *hostName, char *portNumber)

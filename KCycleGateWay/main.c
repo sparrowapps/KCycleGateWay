@@ -47,7 +47,7 @@ gateway                     서버
 #include "uart.h"
 #include "wiringPi.h"
 #include "micomd.h"
-
+#include "main.h"
 #include "logger.h"
 
 #include "base64.h"
@@ -422,7 +422,39 @@ void init_uart_data() {
 }
 
 void jason_parse_test() ;
-// main fd select
+void jason_parse_test() 
+{
+    json_t* pjson;
+    json_t* data;
+    int i;
+    char* result;
+    LOG_DEBUG("janson");
+    pjson = json_array();
+    LOG_DEBUG("janson");
+    json_array_append(pjson, json_integer(42));
+    LOG_DEBUG("janson");
+    json_array_append(pjson, json_integer(42));
+    LOG_DEBUG("janson");
+    json_array_append(pjson, json_integer(42));
+    LOG_DEBUG("janson");
+ 
+    printf("size : %d\n", json_array_size(pjson));
+    result = json_dumps(pjson, JSON_ENCODE_ANY);
+    json_dump_file(pjson, "./data.json", JSON_ENCODE_ANY);
+    printf("%s\n", result);
+ 
+    json_decref(pjson);
+
+}
+
+void test (unsigned char ** b)
+{
+    unsigned char  *s = "hello world";
+    memcpy(*b, s, 11); 
+}
+
+
+
 int main(int argc, char *argv[]) {
     // e7 47 00 f5 64 : 69 ed c1 6b 70
     // input  10 00 27 01 00
@@ -430,8 +462,7 @@ int main(int argc, char *argv[]) {
 
     //aestest();
 
-    jason_parse_test();
-
+    // jason_parse_test();
 
     main_thread = pthread_self();
     threads_init();
@@ -548,27 +579,3 @@ int main(int argc, char *argv[]) {
 // Cookie: JSESSIONID=5EBE4E35EBC10452C92EC291149B798F
 
 
-void jason_parse_test() 
-{
-    json_t* pjson;
-    json_t* data;
-    int i;
-    char* result;
-    LOG_DEBUG("janson");
-    pjson = json_array();
-    LOG_DEBUG("janson");
-    json_array_append(pjson, json_integer(42));
-    LOG_DEBUG("janson");
-    json_array_append(pjson, json_integer(42));
-    LOG_DEBUG("janson");
-    json_array_append(pjson, json_integer(42));
-    LOG_DEBUG("janson");
- 
-    printf("size : %d\n", json_array_size(pjson));
-    result = json_dumps(pjson, JSON_ENCODE_ANY);
-    json_dump_file(pjson, "./data.json", JSON_ENCODE_ANY);
-    printf("%s\n", result);
- 
-    json_decref(pjson);
-
-}
