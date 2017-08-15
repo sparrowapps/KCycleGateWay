@@ -110,13 +110,13 @@ unsigned char Key[CRL_AES192_KEY] =
     0x62, 0xf8, 0xea, 0xd2, 0x52, 0x2c, 0x6b, 0x7b,
 };
 
+
 /* Initialization Vector */
 unsigned char IV[CRL_AES_BLOCK] =
 {
     0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
     0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f
 };
-
 
 /* Buffer to store the output data */
 unsigned char OutputMessage[PLAINTEXT_LENGTH];
@@ -791,6 +791,8 @@ int check_rf_data(PBYTE data_buf)
                     printf("base64 decode %02X , %02x\n", base_decode[0], base_decode[1]); 
 
                     rf_data_parser(base_decode);
+
+                    //packet_process(base_decode);
                 }
             }
             
@@ -1102,24 +1104,22 @@ void aestest()
     memset(dec_out, 0, sizeof(dec_out));
     memset(enc_temp, 0, sizeof(enc_temp));
 
-    //int enc_pad = 16 - (5 % 16);
-    //memset(enc_temp, enc_pad, (5+enc_pad));
-    //memcpy(enc_temp, ac, 5);
-
+    // int enc_pad = 16 - (5 % 16);
+    // memset(enc_temp, 11, 16);
+    // memcpy(enc_temp, ac, 5);
     int encslength = encrypt_block(enc_out, ac, 5, Key, IV);
+
+    BIO_dump_fp(stdout, enc_out, encslength);
+    
     LOG_DEBUG ("encslength : %d ", encslength  );
     SHA256_CTX ctx;
     SHA256_Init(&ctx);
-    SHA256_Update(&ctx, enc_out, 16);
+    SHA256_Update(&ctx, enc_out, encslength);
     SHA256_Final(digest, &ctx);
 
-    LOG_DEBUG ("%02x %02x %02x %02x %02x",digest[27],digest[28],digest[29],digest[30],digest[31]  );
+    LOG_DEBUG ("%02x %02x %02x %02x %02x   : expected e7 47 00 f5 64 ",digest[27],digest[28],digest[29],digest[30],digest[31]  );
 
-    for (int i=0; i<32; i++){
-        printf( " %02X ", digest[i]);
-    }
-
-    LOG_DEBUG ("===============================================================\n\n\n\n");
+    BIO_dump_fp(stdout, digest, 32); 
 }
 
 int rf_data_parser(PBYTE data_buf)
@@ -1253,40 +1253,82 @@ int packet_process(unsigned char * inputpacket)
     unsigned char * outpacket;
 
     valuebuf = malloc(MAX_PACKET_BYTE);
+    outpacket = malloc(MAX_PACKET_BUFFER);
     memset(valuebuf, 0x00, MAX_PACKET_BYTE);
+    memset(outpacket, 0x00, MAX_PACKET_BUFFER);
     int outpacketlen = 0;
 
-    
+    unsigned char base_encode[MAX_PACKET_BUFFER];
+    memset(base_encode, 0x00, sizeof(base_encode));
+
+    senderid[0] = 0x00;
+    senderid[1] = 0x00;
+    senderid[2] = 0x01;
 
     if ( extract_packet(inputpacket, &code, &subcode, senderid, &pn, &len, &valuebuf) == 0 ){
         switch (code)
         {
             case PACKET_CMD_PING_R:
             //todo 내 senderid 를 만들어야 한다.
-                senderid[0] = 0x00;
-                senderid[1] = 0x00;
-                senderid[2] = 0x01;
-
-                outpacket = malloc(MAX_PACKET_BUFFER);
-                memset(outpacket, 0x00, MAX_PACKET_BUFFER);
+                
                 outpacketlen = 0;
-                make_packet(code + 1, 0x00, senderid, 0, 5, "HELLO", &outpacket, &outpacketlen);
-                unsigned char base_encode[MAX_PACKET_BUFFER];
+                make_packet(PACKET_CMD_PING_S, 0x00, senderid, 0, 5, "HELLO", &outpacket, &outpacketlen);
+                
+                
                 base64_encode(outpacket, outpacketlen , base_encode);
+                
                 ipc_send_flag = 1;
-
                 sprintf(cmd_buffer[_AT_USER_CMD], "%s\r\n", base_encode);
                 cmd_id = _AT_USER_CMD;
                 break;
+
+        
+            case PACKET_CMD_INSPECTION_R:
+                //IR_LINE 성공 여부 기록
+                if (valuebuf[0] == 0) {
+                    //바퀴 인식 실패, IR인식 실패
+                } else if (valuebuf[0] == 1) {
+                    //바퀴 인식 성공, IR인식 실패
+                } else if (valuebuf[0] == 2) {
+                    //바퀴 인식 실패, IR인식 성공
+                } else {
+                    //성공, 성공
+                }
+
+                //응답 valuebuf ?? --> 0x00
+
+                outpacketlen = 0;
+                make_packet(PACKET_CMD_INSPECTION_S, 0x00, senderid, 0, 1, 0x00, &outpacket, &outpacketlen);
+                
+                base64_encode(outpacket, outpacketlen , base_encode);
+                
+                ipc_send_flag = 1;
+                sprintf(cmd_buffer[_AT_USER_CMD], "%s\r\n", base_encode);
+                cmd_id = _AT_USER_CMD;
+                break;
+
+            case PACKET_CMD_ENCKEYREQMSG_R:
+                // todo 서버에 인크립션키를 요청 한다. 
+
+                // 응답
+                outpacketlen = 0;
+                make_packet(PACKET_CMD_ENCKEYREQMSG_S, 0x00, senderid, 0, 0, NULL, &outpacket, &outpacketlen);
+                
+                base64_encode(outpacket, outpacketlen , base_encode);
+                
+                ipc_send_flag = 1;
+                sprintf(cmd_buffer[_AT_USER_CMD], "%s\r\n", base_encode);
+                cmd_id = _AT_USER_CMD;
+                break;                
+
             default:
                 //nothing todo
                 break;
         }
-
     }
 
     free(valuebuf);
-
+    free(outpacket);
     return 0;
 
 }
@@ -1351,10 +1393,14 @@ void make_packet(char code,
     free(ac);
 
     //0 0 ac10 12:len
-    int encslength = encrypt_block(enc_out, value, (int)len, Key, IV);
-    packetbuf[12] = encslength;
-    memcmp(packetbuf + 13, enc_out, encslength);
-    
+
+    int encslength = 0;
+    if (value != NULL ) {
+        encslength = encrypt_block(enc_out, value, (int)len, Key, IV);
+        packetbuf[12] = encslength;
+        memcmp(packetbuf + 13, enc_out, encslength);
+    }
+
     memcpy(*out_packet, packetbuf, 13 + encslength);
 }
 
@@ -1397,6 +1443,10 @@ void make_ac_code(char * senderid, short pn, unsigned char ** out_ac)
     memset(dec_out, 0x00, sizeof(dec_out));
     memset(enc_temp, 0x00, sizeof(enc_temp));
     memset(digest, 0x00, sizeof(digest));
+
+    int enc_pad = 24 - (5 % 24);
+    memset(enc_temp, enc_pad, (5+enc_pad));
+    memcpy(enc_temp, ac, 5);
 
     int encslength = encrypt_block(enc_out, ac, 5, Key, IV);
 
@@ -1533,7 +1583,18 @@ int write_packet (int fd, PBYTE pbuf, int size) {
 
 
 
-/* AES Encrypt Process */
+/* AES Encrypt Process 
+ https://tools.ietf.org/html/rfc3602
+
+ 128 CBC 
+
+unsigned char key2[] = {0x06, 0xa9, 0x21, 0x40, 0x36, 0xb8, 0xa1, 0x5b, 0x51, 0x2e, 0x03, 0xd5, 0x34, 0x12, 0x00, 0x06};
+unsigned char iv[]   = {0x3d, 0xaf, 0xba, 0x42, 0x9d, 0x9e, 0xb4, 0x30, 0xb4, 0x22, 0xda, 0x80, 0x2c, 0x9f, 0xac, 0x41};
+unsigned char intext[] = "Single block msg";
+0000 - e3 53 77 9c 10 79 ae b8-27 08 94 2d be 77 18 1a   .Sw..y..'..-.w..
+
+패딩을 내부함,, 밖에서 할필요 없음
+*/
 int encrypt_block(unsigned char* cipherText, unsigned char* plainText, unsigned int plainTextLen, unsigned char* key, unsigned char* ivec)
 {
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
