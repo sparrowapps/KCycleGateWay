@@ -53,13 +53,6 @@ gateway                     서버
 #include "base64.h"
 #include <jansson.h>
 
-// function prototype
-static void handle_uart_data(int fd);
-static void handle_uart_request(int fd, char *request);
-static void handle_socket_data(int fd);
-static void handle_socket_request(int fd, char *request);
-static void uart_write(int fd, char *msg);
-static void http_write( char *msg, int fd);
 
 // Message queue related code
 
@@ -348,29 +341,6 @@ static void handle_uart_request(int fd, char *request) {
             message_queue_write(&uart_w_queue, message);
         }
 
-        // UART cmd ? HTTP cmd ?
-        // --> https 로 바이패스 하도록 수정 해야 함
-#if 0        
-        if(!strncmp(request, "UART", 4)) {
-            char *msg_txt = request+4;
-
-            struct gateway_op *message = message_queue_message_alloc_blocking(&uart_w_queue);
-            message->operation = OP_WRITE_UART;
-            message->message_txt = msg_txt;
-            message->uartfd = fd;
-            message_queue_write(&uart_w_queue, message);
-        } else if (!strncmp(request, "HTTP", 4)) {
-            char *msg_txt = request+4;
-
-            struct gateway_op *message = message_queue_message_alloc_blocking(&https_queue);
-            message->operation = OP_WRITE_HTTP;
-            message->message_txt = msg_txt;
-            message->socketfd = fd;
-            message_queue_write(&https_queue, message);    
-        } else {
-            close(fd);
-        }
-#endif
         uart_data[fd].pos = 0;
         memset(uart_data[fd].buf, 0x00, sizeof (uart_data[fd].buf));
     } else {
@@ -382,6 +352,10 @@ static void uart_write(int fd,  char *msg) {
     int r = write_packet(fd, msg, strlen(msg));
 }
 
+
+/*
+    SSL write 후 응담을 uart로 쏴야 할경우 여기서 처리 해야 한다.
+*/
 static void http_write( char *msg, int fd) {
     int outmsglen = 0;
     unsigned char * outmsg = NULL;
@@ -564,17 +538,3 @@ int main(int argc, char *argv[]) {
         perror("Error listening on uart or socket");
     }
 }
-
-// message 전문
-// GET /gateway/hello HTTP/1.1
-// Host: 115.136.138.81:4432
-// Connection: keep-alive
-// Cache-Control: max-age=0
-// Upgrade-Insecure-Requests: 1
-// User-Agent: Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36
-// Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
-// Accept-Encoding: gzip, deflate, sdch, br
-// Accept-Language: ko-KR,ko;q=0.8,en-US;q=0.6,en;q=0.4
-// Cookie: JSESSIONID=5EBE4E35EBC10452C92EC291149B798F
-
-
