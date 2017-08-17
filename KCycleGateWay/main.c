@@ -395,47 +395,54 @@ void init_uart_data() {
     }
 }
 
-void jason_parse_test() ;
-void jason_parse_test() 
-{
-    json_t* pjson;
-    json_t* data;
-    int i;
-    char* result;
-    LOG_DEBUG("janson");
-    pjson = json_array();
-    LOG_DEBUG("janson");
-    json_array_append(pjson, json_integer(42));
-    LOG_DEBUG("janson");
-    json_array_append(pjson, json_integer(42));
-    LOG_DEBUG("janson");
-    json_array_append(pjson, json_integer(42));
-    LOG_DEBUG("janson");
- 
-    printf("size : %d\n", json_array_size(pjson));
-    result = json_dumps(pjson, JSON_ENCODE_ANY);
-    json_dump_file(pjson, "./data.json", JSON_ENCODE_ANY);
-    printf("%s\n", result);
- 
-    json_decref(pjson);
 
+// JSON 만들기
+char * make_json(char * key, char * value) 
+{
+    json_t* root;
+    char * str;
+
+    root  = json_pack("{s:s}", key, value);
+    str = json_dumps(root, JSON_ENCODE_ANY);
+    return str;
 }
 
-void test (unsigned char ** b)
-{
-    unsigned char  *s = "hello world";
-    memcpy(*b, s, 11); 
+//JSON  문자열에서 value 얻기
+json_t *load_json(const char *text) {
+    json_t *root;
+    json_error_t error;
+
+    root = json_loads(text, 0, &error);
+
+    if (root) {
+        return root;
+    } else {
+        fprintf(stderr, "json error on line %d: %s\n", error.line, error.text);
+        return (json_t *)0;
+    }
 }
 
-
+char * from_json(const char * json, char * key)
+{
+    char * res;
+    json_t * root = load_json(json);
+    
+    json_unpack(root, "{s:s}", key, &res);
+    return res;
+}
 
 int main(int argc, char *argv[]) {
     // e7 47 00 f5 64 : 69 ed c1 6b 70
     // input  10 00 27 01 00
     // output e7 47 00 f5 64
 
+    // char * str = make_json("value", "hello");
 
-    // jason_parse_test();
+    // printf("str = %s \n ", str);
+
+    // char * value = from_json("{\"value\": \"hello\"}", "value");
+    // printf("str = %s \n", value);
+    // return 0;
 
     main_thread = pthread_self();
     threads_init();
