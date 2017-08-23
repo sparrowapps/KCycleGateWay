@@ -431,6 +431,8 @@ char * from_json(const char * json, char * key)
     return res;
 }
 
+
+
 int main(int argc, char *argv[]) {
     // e7 47 00 f5 64 : 69 ed c1 6b 70
     // input  10 00 27 01 00
@@ -443,6 +445,7 @@ int main(int argc, char *argv[]) {
     // char * value = from_json("{\"value\": \"hello\"}", "value");
     // printf("str = %s \n", value);
     // return 0;
+    aestest2();
 
     main_thread = pthread_self();
     threads_init();

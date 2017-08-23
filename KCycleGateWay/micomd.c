@@ -571,9 +571,9 @@ int check_rf_data(PBYTE data_buf)
 
                     printf("base64 decode %02X , %02x\n", base_decode[0], base_decode[1]); 
 
-                    rf_data_parser(base_decode);
+                    rf_data_parser(base_decode, addr); //응답 addr을 보내야 한다.
 
-                    //packet_process(base_decode);
+                    //packet_process(base_decode, addr);
                 }
             }
             
@@ -903,7 +903,25 @@ void aestest()
     BIO_dump_fp(stdout, digest, 32); 
 }
 
-int rf_data_parser(PBYTE data_buf)
+void aestest2() {
+    unsigned char enc_out[1000];
+    unsigned char dec_out[1000];
+    unsigned char enc_temp[1000];
+
+    unsigned char plText[1000];
+    memset(plText, 0x00, sizeof(plText));
+    memcpy(plText,"HELLO", 5);
+    
+    memset(enc_out, 0, sizeof(enc_out));
+    int encslength = encrypt_block(enc_out, plText, strlen(plText), Key, IV);
+    BIO_dump_fp(stdout, enc_out, (int)encslength);
+
+    int decslength = decrypt_block(dec_out, enc_out, encslength, Key, IV);
+    BIO_dump_fp(stdout, dec_out, (int)decslength);
+    LOG_DEBUG("AES TEST END");
+}
+
+int rf_data_parser(PBYTE data_buf, int addr)
 {
     unsigned char *p;
     p = data_buf;
@@ -953,9 +971,7 @@ int rf_data_parser(PBYTE data_buf)
     memset(dec_out, 0, sizeof(dec_out));
     memset(enc_temp, 0, sizeof(enc_temp));
 
-    int enc_pad = 16 - (5 % 16);
-    memset(enc_temp, enc_pad, (5+enc_pad));
-    memcpy(enc_temp, ac, 5);
+
 
     int encslength = encrypt_block(enc_out, ac, 5, Key, IV);
     LOG_DEBUG ("encslength : %d ", encslength  );
@@ -972,7 +988,13 @@ int rf_data_parser(PBYTE data_buf)
         return 0;
     } 
 
+
+
     // value decrypt
+    LOG_DEBUG("LEN = %d\n", (int)len);
+    BIO_dump_fp(stdout, value, (int)len);
+    BIO_dump_fp(stdout, Key, sizeof(Key));
+    BIO_dump_fp(stdout, IV, sizeof(IV));
     int decslength = decrypt_block(dec_out, value, (int)len, Key, IV);
     memcpy(plaintextValue, dec_out, decslength);
     printf("plaintext :%s\n", plaintextValue);
@@ -1006,9 +1028,16 @@ int rf_data_parser(PBYTE data_buf)
 
     memcpy(ac + 5, digest + 27, 5);
 
-    unsigned char * plText = "PING MSG";
+    unsigned char plText[1000];
+    memset(plText, 0x00, sizeof(plText));
+    memcpy(plText,"HELLO", 5);
+    
+    BIO_dump_fp(stdout, Key, sizeof(Key));
+    BIO_dump_fp(stdout, IV, sizeof(IV));
     memset(enc_out, 0, sizeof(enc_out));
     encslength = encrypt_block(enc_out, plText, strlen(plText), Key, IV);
+    BIO_dump_fp(stdout, enc_out, encslength);
+
 
     unsigned char packetbuf[MAX_PACKET_BUFFER];
     packetbuf[0] = code;
@@ -1019,11 +1048,12 @@ int rf_data_parser(PBYTE data_buf)
 
     ipc_send_flag = 1;
 
-    sprintf(cmd_buffer[_AT_USER_CMD], "%s\r\n", packetbuf);
+    sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", addr, packetbuf); //addr to-do
+    LOG_DEBUG("%s",cmd_buffer[_AT_USER_CMD]);
     cmd_id = _AT_USER_CMD;
 }
 
-int packet_process(unsigned char * inputpacket)
+int packet_process(unsigned char * inputpacket, int addr)
 {
     char code;
     char subcode;
@@ -1098,7 +1128,7 @@ int packet_process(unsigned char * inputpacket)
                 base64_encode(outpacket, outpacketlen , base_encode);
                 
                 ipc_send_flag = 1;
-                sprintf(cmd_buffer[_AT_USER_CMD], "%s\r\n", base_encode);
+                sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", addr, base_encode);
                 cmd_id = _AT_USER_CMD;
                 break;                
 
@@ -1430,14 +1460,12 @@ int decrypt_block(unsigned char* plainText, unsigned char* cipherText, unsigned 
     if (EVP_DecryptUpdate(ctx, plainText, &toLen, cipherText, cipherTextLen) != 1) {
         err = ERR_get_error();
         printf("ERR: EVP_DecryptUpdate() - %s\n", ERR_error_string (err, NULL));
-
         return -1;
     }
 
     if (EVP_DecryptFinal(ctx, &plainText[cipherTextLen], &outLen) != 1) {
         err = ERR_get_error();
         printf("ERR: EVP_DecryptFinal() - %s\n", ERR_error_string (err, NULL));
-
         return -1;
     }
 

@@ -166,7 +166,7 @@ int read_packet (int fd, int cnt, PBYTE buf, int fd_index);
 int check_socket (PBYTE data_buf, WORD size, int fd);
 int check_rf_data(PBYTE data_buf);
 int check_uart (PBYTE data_buf);
-int rf_data_parser(PBYTE data_buf);
+int rf_data_parser(PBYTE data_buf, int addr);
 BYTE* hex_decode(char *in, int len, BYTE *out);
 int parse_data (PBYTE data_buf, int *cnt);
 int get_max_fd (int a, int b, int c);
@@ -200,5 +200,7 @@ int hex2val(const char ch);
 
 int extract_packet (unsigned char * inputpacket, char * outcode, char * outsubcode, char * outsenderid, short * outpn, char * outlen, unsigned char ** outvalue);
 void aestest();
+void aestest2();
+int packet_process(unsigned char * inputpacket, int addr);
 #endif /* _MICOM_H_ */
 
