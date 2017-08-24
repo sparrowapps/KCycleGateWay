@@ -146,3 +146,6 @@ cd KCycleGateWay/KCycleGateWay/build
 make clean; make
 ./KCycleGateWay
 ~~~
+
+## How to Clone Your Raspberry Pi SD Card for Super Easy Reinstallations
+https://lifehacker.com/how-to-clone-your-raspberry-pi-sd-card-for-super-easy-r-1261113524
