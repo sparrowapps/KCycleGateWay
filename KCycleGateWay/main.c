@@ -327,8 +327,8 @@ static void handle_uart_request(int fd, char *request) {
         // ipc_send_flag : AT 전송 데이터
         if (ipc_send_flag == 1) {
             struct gateway_op *message = message_queue_message_alloc_blocking(&uart_w_queue);
-            printf("cmd_id %d\n",cmd_id);
-            printf("send to uart...[fd:%d, cmd_buffer[%d]: %s].... \n", fd, strlen((char *)cmd_buffer[cmd_id]), (char *)cmd_buffer[cmd_id]);
+            LOG_DEBUG("cmd_id %d\n",cmd_id);
+            LOG_DEBUG("send to uart...[fd:%d, cmd_buffer[%d]: %s].... \n", fd, strlen((char *)cmd_buffer[cmd_id]), (char *)cmd_buffer[cmd_id]);
             message->operation = OP_WRITE_UART;
 
             cmd_state = cmd_id; //이전 전송 메세지를 할당
@@ -372,8 +372,8 @@ static void http_write( char *msg, int fd) {
         // message->uartfd = fd;
         // message_queue_write(&uart_w_queue, message);
         if ( strstr(outmsg, "allOff") != NULL ) {
-            printf("send off message to all DEVICE \n");
-            printf("OK response from DEVICE\n");
+            LOG_DEBUG("send off message to all DEVICE \n");
+            LOG_DEBUG("OK response from DEVICE\n");
             
             unsigned char * buf;
             struct gateway_op *message = message_queue_message_alloc_blocking(&https_queue);

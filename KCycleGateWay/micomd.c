@@ -317,7 +317,7 @@ int ssl_write(unsigned char * msg, unsigned char ** outmsg, int * outmsglen) {
     bytes = SSL_read(sslOpenToServer.ssl, buf, MAX_HTTPS_PACKET_BUFFER);
     buf[bytes] = 0;
 
-    printf("\n https response %d bytes\n", bytes);
+    LOG_DEBUG("\n https response %d bytes\n", bytes);
     BIO_dump_fp(stdout, buf, bytes);
 
     SSLCloseToServer(&sslOpenToServer);
@@ -346,10 +346,10 @@ int init_wiringPi() {
     digitalWrite(RST, 1);
     delay(1000);
     digitalWrite(RST, 0);
-    printf("RST low.............\n");
+    LOG_DEBUG("RST low.............\n");
     delay(1000);
     digitalWrite(RST, 1);
-    printf("RST high.............\n");
+    LOG_DEBUG("RST high.............\n");
 
     return 0;
 }
@@ -361,7 +361,7 @@ int open_uart() {
     do {
         uart_fd = uart_open();
         if (uart_fd < 0) {
-            printf("UART open failed!\n");
+            LOG_DEBUG("UART open failed!\n");
         }
     } while (uart_fd < 0);
 
@@ -381,7 +381,7 @@ int create_socket (int portnum)
     do {
         fd = socket(PF_INET, SOCK_STREAM, 0);
         if (fd < 0) {
-            printf("Failed to create the server socket!\n");
+            LOG_DEBUG("Failed to create the server socket!\n");
         }
     } while (fd < 0);
 
@@ -396,14 +396,14 @@ int create_socket (int portnum)
     do {
         state = bind(fd, (struct sockaddr *)&address, sizeof(address));
         if (state < 0) {
-            printf("Bind error!\n");
+            LOG_DEBUG("Bind error!\n");
         }
     } while (state < 0);
 
     do {
         state = listen(fd, 5);
         if (state < 0) {
-            printf("Failed to set the ready state!\n");
+            LOG_DEBUG("Failed to set the ready state!\n");
         }
     } while (state < 0);
 
@@ -413,19 +413,17 @@ int create_socket (int portnum)
 int read_packet (int fd, int cnt, PBYTE buf, int fd_index)
 {
     int ret = 0;
-    //int index = 0, it = 0;
-    //char msg[256] = {0, };
 
     if(fd > 0) {
         do {
             ret = read(fd, &buf[cnt], MAX_PACKET_BYTE);
         } while (ret == -1);
         cnt += ret;
-        //printf("read packet size = %d, cnt = %d, buf = %s\n", ret, cnt, buf);
+        
 
         return cnt;
     } else {
-        printf("read packet fd error.....[%d]    \n", fd);
+        LOG_DEBUG("read packet fd error.....[%d]    \n", fd);
         return -1;
     }
 }
@@ -445,11 +443,11 @@ int check_rf_data(PBYTE data_buf)
 
     if(memcmp(data_buf, AT_PAIR, 9) == 0)
     {
-        printf("parse REG.START\n");
+        LOG_DEBUG("parse REG.START\n");
     }
     else if(memcmp(data_buf, TOKEN_TGT, 3) == 0)
     {
-        printf("parse TGT\n");
+        LOG_DEBUG("parse TGT\n");
     }
     else if(memcmp(data_buf, HEADER, 6) == 0 || memcmp(data_buf, AT_OK, 2) == 0)
     {
@@ -461,10 +459,10 @@ int check_rf_data(PBYTE data_buf)
         token = strtok((char *)data_buf, div);
         while(token != NULL)
         {
-            printf("token = %s\n", token);
+            LOG_DEBUG("token = %s\n", token);
             if(strcmp(token, AT_OK) == 0)
             {
-                printf("parse OK\n");
+                LOG_DEBUG("parse OK\n");
                 cmd_state = 19;
             }
             else if(strcmp(token, TOKEN_BAND) == 0)
@@ -515,7 +513,7 @@ int check_rf_data(PBYTE data_buf)
             cmd_id = _AT_START;
             ipc_send_flag = 1;
             data_status = 1;
-            printf("send_message = %s , send_flag = %d\n", cmd_buffer[0], ipc_send_flag);
+            LOG_DEBUG("send_message = %s , send_flag = %d\n", cmd_buffer[0], ipc_send_flag);
         }
         else 
         {
@@ -525,7 +523,7 @@ int check_rf_data(PBYTE data_buf)
                 rst_status = 0;
                 data_status = 0;
                 cmd_state = _AT_USER_CMD;
-                printf("data receiving status................\n");
+                LOG_DEBUG("data receiving status................\n");
             }
             else
             {
@@ -543,7 +541,7 @@ int check_rf_data(PBYTE data_buf)
         token = strtok((char *)data_buf, div);
         while(token != NULL)
         {
-            printf("token = %s\n", token);
+            LOG_DEBUG("token = %s\n", token);
             if(check_addr == 0)
             {
                 LOG_DEBUG("token = %s\n", token);
@@ -566,14 +564,12 @@ int check_rf_data(PBYTE data_buf)
                     unsigned char base_decode[MAX_PACKET_BUFFER];
                     memset(base_decode, 0x00, sizeof(base_decode));
 
-                    printf("RF data : %s\n",token);
+                    LOG_DEBUG("RF data : %s\n",token);
                     base64_decode(token, strlen(token) , base_decode);
 
-                    printf("base64 decode %02X , %02x\n", base_decode[0], base_decode[1]); 
+                    LOG_DEBUG("base64 decode %02X , %02x\n", base_decode[0], base_decode[1]); 
 
                     rf_data_parser(base_decode, addr); //응답 addr을 보내야 한다.
-
-                    //packet_process(base_decode, addr);
                 }
             }
             
@@ -599,7 +595,7 @@ int check_uart (PBYTE data_buf)
         token = strtok((char *)data_buf, div);
         while(token != NULL)
         {
-            printf("token = %s\n", token);
+            LOG_DEBUG("token = %s\n", token);
             if(strcmp(token, TOKEN_BAND) == 0)
             {
                 index = 1;
@@ -647,7 +643,7 @@ int check_uart (PBYTE data_buf)
         {
             cmd_id = _AT_START;
             ipc_send_flag = 1;
-            printf("send_message = %s , send_flag = %d\n", cmd_buffer[0], ipc_send_flag);
+            LOG_DEBUG("send_message = %s , send_flag = %d\n", cmd_buffer[0], ipc_send_flag);
         }
         else 
         {
@@ -657,7 +653,7 @@ int check_uart (PBYTE data_buf)
                 rst_status = 0;
                 data_status = 0;
                 cmd_state = _AT_USER_CMD;
-                printf("data receiving status................\n");
+                LOG_DEBUG("data receiving status................\n");
             }
             else
             {
@@ -794,7 +790,7 @@ int check_uart (PBYTE data_buf)
                     {
                         hex_decode((char *)(data_buf + 3*i), 1, &dev_id[i]);
 
-                        printf("device_id[%d] = %x  \n", i, dev_id[i]);
+                        LOG_DEBUG("device_id[%d] = %x  \n", i, dev_id[i]);
                     }
                     cmd_id = _AT_PAIR;
                     ipc_send_flag = 1;
@@ -814,7 +810,7 @@ int check_uart (PBYTE data_buf)
         {
             hex_decode((char *)(data_buf + 3*i), 1, &dev_id[i]);
         
-            printf("device_id[%d] = %x    \n", i, dev_id[i]);
+            LOG_DEBUG("device_id[%d] = %x    \n", i, dev_id[i]);
         }
         cmd_id = _AT_PAIR;
         ipc_send_flag = 1;
@@ -827,7 +823,7 @@ int check_uart (PBYTE data_buf)
         token = strtok((char *)data_buf, div);
         while(token != NULL)
         {
-            printf("token = %s   strlen = %d \n", token, strlen(token));
+            LOG_DEBUG("token = %s   strlen = %d \n", token, strlen(token));
 
             if(strlen(token) >= 1 && strlen(token) < 4)
             {
@@ -840,7 +836,7 @@ int check_uart (PBYTE data_buf)
                 for(i = 0; i < 3; i++)
                 {
                     hex_decode((char *)(token + 3*i), 1, &devices[device_idx].dev_id[i]);
-                    printf("device_id[%d] = %x    \n", i, devices[device_idx].dev_id[i]);
+                    LOG_DEBUG("device_id[%d] = %x    \n", i, devices[device_idx].dev_id[i]);
                 }
                 device_idx++;
             }
@@ -850,10 +846,10 @@ int check_uart (PBYTE data_buf)
         if(list_end == 1)
         {
             int it = 0;
-            printf("======   list in devices[%d]   ======\n", device_idx);
+            LOG_DEBUG("======   list in devices[%d]   ======\n", device_idx);
             for(it = 0; it < device_idx; it++)
             {
-                printf("device[%d] addr = %d, id = [%x %x %x]\n", it, devices[it].dev_addr, devices[it].dev_id[0], devices[it].dev_id[1], devices[it].dev_id[2]);
+                LOG_DEBUG("device[%d] addr = %d, id = [%x %x %x]\n", it, devices[it].dev_addr, devices[it].dev_id[0], devices[it].dev_id[1], devices[it].dev_id[2]);
             }
 
             cmd_id = _AT_RST;
@@ -933,10 +929,6 @@ int rf_data_parser(PBYTE data_buf, int addr)
 
     unsigned char * encbuf;
     
-
-    printf ("code %02X\n", code);
-    printf ("subcode %02X\n", subcode);
-
     p = p + 2;
     memcpy(ac, p, 10);
     p = p + 10;
@@ -956,11 +948,8 @@ int rf_data_parser(PBYTE data_buf, int addr)
     packetnumber[0] = ac[3];
     packetnumber[1] = ac[4];
 
-    printf ("sender id %02x, %02x, %02x\n", senderid[0], senderid[1], senderid[2]);
     unsigned short pn = 0;
     pn = (short)(packetnumber[1] << 8) +  (short)(packetnumber[0]);
-    LOG_DEBUG ("packet num %d %d\n", packetnumber[0], packetnumber[1]);
-    LOG_DEBUG ("packet num %d\n", pn );
 
     unsigned char digest[SHA256_DIGEST_LENGTH];
     unsigned char enc_out[1000];
@@ -971,8 +960,6 @@ int rf_data_parser(PBYTE data_buf, int addr)
     memset(dec_out, 0, sizeof(dec_out));
     memset(enc_temp, 0, sizeof(enc_temp));
 
-
-
     int encslength = encrypt_block(enc_out, ac, 5, Key, IV);
     LOG_DEBUG ("encslength : %d ", encslength  );
     SHA256_CTX ctx;
@@ -980,24 +967,22 @@ int rf_data_parser(PBYTE data_buf, int addr)
     SHA256_Update(&ctx, enc_out, encslength);
     SHA256_Final(digest, &ctx);
 
-
-    LOG_DEBUG ("%02x %02x %02x %02x %02x",ac[0],ac[1],ac[2],ac[3],ac[4]);
-    LOG_DEBUG ("%02x %02x %02x %02x %02x : %02x %02x %02x %02x %02x",ac[5],ac[6],ac[7],ac[8],ac[9], digest[27],digest[28],digest[29],digest[30],digest[31]  );
+#ifdef _PACKET_ENCRYPTY
     if ( memcmp(ac + 5, digest + 27, 5) != 0 ) {
-        printf("ac code fail\n");
+        LOG_DEBUG("ac code fail\n");
         return 0;
     } 
-
-
+#endif
 
     // value decrypt
-    LOG_DEBUG("LEN = %d\n", (int)len);
-    BIO_dump_fp(stdout, value, (int)len);
-    BIO_dump_fp(stdout, Key, sizeof(Key));
-    BIO_dump_fp(stdout, IV, sizeof(IV));
+#ifdef _PACKET_ENCRYPTY
     int decslength = decrypt_block(dec_out, value, (int)len, Key, IV);
     memcpy(plaintextValue, dec_out, decslength);
-    printf("plaintext :%s\n", plaintextValue);
+    LOG_DEBUG("plaintext :%s\n", plaintextValue);
+#else
+    memcpy(plaintextValue, value, (int)len);
+    LOG_DEBUG("plaintext :%s\n", plaintextValue);
+#endif
 
     // 내 아이디를 얻어 놔야 한다.
 
@@ -1032,13 +1017,12 @@ int rf_data_parser(PBYTE data_buf, int addr)
     memset(plText, 0x00, sizeof(plText));
     memcpy(plText,"HELLO", 5);
     
-    BIO_dump_fp(stdout, Key, sizeof(Key));
-    BIO_dump_fp(stdout, IV, sizeof(IV));
     memset(enc_out, 0, sizeof(enc_out));
+#ifdef _PACKET_ENCRYPTY
     encslength = encrypt_block(enc_out, plText, strlen(plText), Key, IV);
-    BIO_dump_fp(stdout, enc_out, encslength);
-
-
+#else
+    memcpy(enc_out, plText, strlen(plText));
+#endif
     unsigned char packetbuf[MAX_PACKET_BUFFER];
     packetbuf[0] = code;
     packetbuf[1] = subcode;
@@ -1085,14 +1069,12 @@ int packet_process(unsigned char * inputpacket, int addr)
                 outpacketlen = 0;
                 make_packet(PACKET_CMD_PING_S, 0x00, senderid, 0, 5, "HELLO", &outpacket, &outpacketlen);
                 
-                
                 base64_encode(outpacket, outpacketlen , base_encode);
                 
                 ipc_send_flag = 1;
                 sprintf(cmd_buffer[_AT_USER_CMD], "%s\r\n", base_encode);
                 cmd_id = _AT_USER_CMD;
                 break;
-
         
             case PACKET_CMD_INSPECTION_R:
                 //IR_LINE 성공 여부 기록
@@ -1141,9 +1123,7 @@ int packet_process(unsigned char * inputpacket, int addr)
     free(valuebuf);
     free(outpacket);
     return 0;
-
 }
-
 
 // 입력 받은 패킷을 분해 한다.
 int extract_packet (unsigned char * inputpacket, 
@@ -1155,7 +1135,6 @@ int extract_packet (unsigned char * inputpacket,
                     unsigned char ** outvalue)
 {
     unsigned char dec_out[1000];
-    unsigned char outbuf[MAX_PACKET_BYTE];
 
     outcode[0] = inputpacket[0];
     outsubcode[0] = inputpacket[1];
@@ -1170,9 +1149,14 @@ int extract_packet (unsigned char * inputpacket,
         *outlen = *(inputpacket + 12);
         
         //plaintext
+#ifdef _PACKET_ENCRYPTY
         int decslength = decrypt_block(dec_out, inputpacket + 13, *outlen, Key, IV);
         memcpy(*outvalue, dec_out, decslength);
-        printf("plaintext :%s\n", outbuf);
+        LOG_DEBUG("plaintext :%s\n", *outvalue);
+#else 
+        memcpy(*outvalue, inputpacket + 13, *outlen);
+        LOG_DEBUG("plaintext :%s\n", *outvalue);
+#endif
 
         return 0;
     } else {
@@ -1207,9 +1191,14 @@ void make_packet(char code,
 
     int encslength = 0;
     if (value != NULL ) {
+#ifdef _PACKET_ENCRYPTY        
         encslength = encrypt_block(enc_out, value, (int)len, Key, IV);
         packetbuf[12] = encslength;
         memcmp(packetbuf + 13, enc_out, encslength);
+#else
+        packetbuf[12] = (int)len;
+        memcpy(packetbuf + 13, value, (int)len);
+#endif        
     }
 
     memcpy(*out_packet, packetbuf, 13 + encslength);
@@ -1218,6 +1207,7 @@ void make_packet(char code,
 // AC 코드 확인
 int validate_ac(char * senderid, short pn, unsigned char * acbuf)
 {
+#ifdef _PACKET_ENCRYPTY
     unsigned char * ac;
     ac = malloc(10);
     make_ac_code(senderid, pn, &ac);
@@ -1229,6 +1219,9 @@ int validate_ac(char * senderid, short pn, unsigned char * acbuf)
         free(ac);
         return -1;
     }
+#else 
+    return 0;
+#endif
 }
 
 // AC 코드 생성
@@ -1306,14 +1299,14 @@ int parse_data (PBYTE data_buf, int *cnt)
             index++;
     }
 
-    printf("parse_data ===> cmd_state[%d], index[%d]\n", cmd_state, index);
+    LOG_DEBUG("parse_data ===> cmd_state[%d], index[%d]\n", cmd_state, index);
     if(cmd_state != -1 && cmd_state != _AT_START)
     {
         if(cmd_state == _AT_RST)
         {
             if(index >= 3)
             {
-                printf("parse_data ===> cmd_state[%d], index[%d]\n", cmd_state, index);
+                LOG_DEBUG("parse_data ===> cmd_state[%d], index[%d]\n", cmd_state, index);
                 return 1;
             }
             else
@@ -1323,7 +1316,7 @@ int parse_data (PBYTE data_buf, int *cnt)
         {
             if(index == 1)
             {
-                printf("parse_data ===> cmd_state[%d], index[%d]\n", cmd_state, index);
+                LOG_DEBUG("parse_data ===> cmd_state[%d], index[%d]\n", cmd_state, index);
                 return 1;
             }
             else
@@ -1337,7 +1330,7 @@ int parse_data (PBYTE data_buf, int *cnt)
             LOG_DEBUG("parse_data ===> cmd_state[%d], index[%d]\n", cmd_state, index);
             if(index >= 3)
             {
-                printf("parse_data ===> cmd_state[%d], index[%d]\n", cmd_state, index);
+                LOG_DEBUG("parse_data ===> cmd_state[%d], index[%d]\n", cmd_state, index);
                 return 1;
             }
             else
@@ -1347,7 +1340,7 @@ int parse_data (PBYTE data_buf, int *cnt)
         {
             if(memcmp(data_buf, AT_ST_HEADER, 8) == 0)
             {
-                printf("parse_data ===> cmd_state[%d], index[%d]\n", cmd_state, index);
+                LOG_DEBUG("parse_data ===> cmd_state[%d], index[%d]\n", cmd_state, index);
                 return 1;
             }
             else
@@ -1384,7 +1377,7 @@ int write_packet (int fd, PBYTE pbuf, int size) {
             wrtsize += write(fd, pbuf+wrtsize, size-wrtsize);
         } while ((size - wrtsize) > 0);
 
-        printf("write packet fd(%d), size(%d)\n", fd, size);
+        LOG_DEBUG("write packet fd(%d), size(%d)\n", fd, size);
 
         return 0;
     } else {
@@ -1414,28 +1407,27 @@ int encrypt_block(unsigned char* cipherText, unsigned char* plainText, unsigned 
 
     ERR_load_crypto_strings();
     EVP_CIPHER_CTX_init(ctx);
-    printf("EVP_CIPHER_CTX_init() ---------------\n");
+    
 
     if (EVP_EncryptInit(ctx, EVP_aes_192_cbc(), key, ivec) != 1) {
         err = ERR_get_error();
-        printf("ERR: EVP_EncryptInit() - %s\n", ERR_error_string (err, NULL));
+        LOG_DEBUG("ERR: EVP_EncryptInit() - %s\n", ERR_error_string (err, NULL));
         return -1;
     }
-    printf("EVP_EncryptInit() ---------------\n");
+    
     if (EVP_EncryptUpdate(ctx, cipherText, &orgLen, plainText, plainTextLen) != 1) {
         err = ERR_get_error();
-        printf("ERR: EVP_EncryptUpdate() - %s\n", ERR_error_string (err, NULL));
-
+        LOG_DEBUG("ERR: EVP_EncryptUpdate() - %s\n", ERR_error_string (err, NULL));
         return -1;
     }
-    printf("EVP_EncryptUpdate() ---------------\n");
+    
 
     if (EVP_EncryptFinal(ctx, cipherText+orgLen, &addLen) != 1) {
         err = ERR_get_error();
-        printf("ERR: EVP_EncryptFinal() - %s\n", ERR_error_string (err, NULL));
+        LOG_DEBUG("ERR: EVP_EncryptFinal() - %s\n", ERR_error_string (err, NULL));
         return -1;
     }
-    printf("EVP_EncryptFinal() ---------------\n");
+    
     EVP_CIPHER_CTX_cleanup(ctx);
     EVP_CIPHER_CTX_free(ctx);
     ERR_free_strings();
@@ -1454,18 +1446,18 @@ int decrypt_block(unsigned char* plainText, unsigned char* cipherText, unsigned 
 
     if (EVP_DecryptInit(ctx, EVP_aes_192_cbc(), key, ivec) != 1) {
         err = ERR_get_error();
-        printf("ERR: EVP_DecryptInit() - %s\n", ERR_error_string (err, NULL));
+        LOG_DEBUG("ERR: EVP_DecryptInit() - %s\n", ERR_error_string (err, NULL));
         return -1;
     }
     if (EVP_DecryptUpdate(ctx, plainText, &toLen, cipherText, cipherTextLen) != 1) {
         err = ERR_get_error();
-        printf("ERR: EVP_DecryptUpdate() - %s\n", ERR_error_string (err, NULL));
+        LOG_DEBUG("ERR: EVP_DecryptUpdate() - %s\n", ERR_error_string (err, NULL));
         return -1;
     }
 
     if (EVP_DecryptFinal(ctx, &plainText[cipherTextLen], &outLen) != 1) {
         err = ERR_get_error();
-        printf("ERR: EVP_DecryptFinal() - %s\n", ERR_error_string (err, NULL));
+        LOG_DEBUG("ERR: EVP_DecryptFinal() - %s\n", ERR_error_string (err, NULL));
         return -1;
     }
 
@@ -1475,7 +1467,6 @@ int decrypt_block(unsigned char* plainText, unsigned char* cipherText, unsigned 
 
     return toLen+outLen;
 }
-
 
 int hex2val(const char ch)
 {

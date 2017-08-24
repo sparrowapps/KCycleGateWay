@@ -1,5 +1,7 @@
 #define _BSD_SOURCE
 
+// #define _PACKET_ENCRYPTY
+
 // function prototype
 static void handle_uart_data(int fd);
 static void handle_uart_request(int fd, char *request);
