@@ -569,7 +569,8 @@ int check_rf_data(PBYTE data_buf)
 
                     LOG_DEBUG("base64 decode %02X , %02x\n", base_decode[0], base_decode[1]); 
 
-                    rf_data_parser(base_decode, addr); //응답 addr을 보내야 한다.
+                    //rf_data_parser(base_decode, addr); //응답 addr을 보내야 한다.
+                    packet_process(base_decode, addr);
                 }
             }
             
@@ -1022,19 +1023,24 @@ int rf_data_parser(PBYTE data_buf, int addr)
     encslength = encrypt_block(enc_out, plText, strlen(plText), Key, IV);
 #else
     memcpy(enc_out, plText, strlen(plText));
+    encslength = strlen(plText)
 #endif
     unsigned char packetbuf[MAX_PACKET_BUFFER];
-    packetbuf[0] = code;
+    packetbuf[0] = 0x02;
     packetbuf[1] = subcode;
     memcpy(packetbuf + 2, ac, 10);
     packetbuf[12] = encslength;
-    memcpy(packetbuf+ 12, enc_out, encslength);
+    memcpy(packetbuf+ 13, enc_out, encslength);
+    LOG_DEBUG("encslength : %d",encslength);
 
-    ipc_send_flag = 1;
+    unsigned char base_encode[MAX_PACKET_BUFFER];
+    memset(base_encode, 0x00, sizeof(base_encode));
+    base64_encode(packetbuf, 13 + encslength, base_encode);
 
-    sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", addr, packetbuf); //addr to-do
-    LOG_DEBUG("%s",cmd_buffer[_AT_USER_CMD]);
+    sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", addr, base_encode); //addr to-do
+    LOG_DEBUG("WRITE : %s",cmd_buffer[_AT_USER_CMD]);
     cmd_id = _AT_USER_CMD;
+    ipc_send_flag = 1;
 }
 
 int packet_process(unsigned char * inputpacket, int addr)
@@ -1056,23 +1062,31 @@ int packet_process(unsigned char * inputpacket, int addr)
     unsigned char base_encode[MAX_PACKET_BUFFER];
     memset(base_encode, 0x00, sizeof(base_encode));
 
-    senderid[0] = 0x00;
-    senderid[1] = 0x00;
-    senderid[2] = 0x01;
+    // 내아이디 얻기를 해야 함
+
+
 
     if ( extract_packet(inputpacket, &code, &subcode, senderid, &pn, &len, &valuebuf) == 0 ){
         switch (code)
         {
+            
             case PACKET_CMD_PING_R:
             //todo 내 senderid 를 만들어야 한다.
-                
+                LOG_DEBUG("cmd PACKET_CMD_PING_R");
                 outpacketlen = 0;
+
+                senderid[0] = 0x00;
+                senderid[1] = 0x00;
+                senderid[2] = 0x01;
                 make_packet(PACKET_CMD_PING_S, 0x00, senderid, 0, 5, "HELLO", &outpacket, &outpacketlen);
                 
-                base64_encode(outpacket, outpacketlen , base_encode);
+                BIO_dump_fp(stdout, outpacket, outpacketlen);
                 
+                base64_encode(outpacket, outpacketlen , base_encode);
+                LOG_DEBUG("outpacketlen : %d", outpacketlen);
                 ipc_send_flag = 1;
-                sprintf(cmd_buffer[_AT_USER_CMD], "%s\r\n", base_encode);
+                sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", addr, base_encode);
+                LOG_DEBUG("cmd_buffer : %s", cmd_buffer[_AT_USER_CMD]);
                 cmd_id = _AT_USER_CMD;
                 break;
         
@@ -1096,7 +1110,7 @@ int packet_process(unsigned char * inputpacket, int addr)
                 base64_encode(outpacket, outpacketlen , base_encode);
                 
                 ipc_send_flag = 1;
-                sprintf(cmd_buffer[_AT_USER_CMD], "%s\r\n", base_encode);
+                sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", addr, base_encode);
                 cmd_id = _AT_USER_CMD;
                 break;
 
@@ -1143,9 +1157,10 @@ int extract_packet (unsigned char * inputpacket,
     outsenderid[1] = inputpacket[3];
     outsenderid[2] = inputpacket[4];
 
-    *outpn = inputpacket[5] + inputpacket[6] << 8;
+    //pn = (short)(packetnumber[1] << 8) +  (short)(packetnumber[0]);
+    *outpn = (short)inputpacket[5] + (short)(inputpacket[6] << 8);
 
-    if (validate_ac(inputpacket + 2, *outpn, inputpacket + 7) == 0){
+    if (validate_ac(inputpacket + 2, *outpn, inputpacket + 2) == 0){
         *outlen = *(inputpacket + 12);
         
         //plaintext
@@ -1160,6 +1175,7 @@ int extract_packet (unsigned char * inputpacket,
 
         return 0;
     } else {
+        LOG_DEBUG("AC fail \n");
         return -1;
     }
     
@@ -1194,14 +1210,18 @@ void make_packet(char code,
 #ifdef _PACKET_ENCRYPTY        
         encslength = encrypt_block(enc_out, value, (int)len, Key, IV);
         packetbuf[12] = encslength;
-        memcmp(packetbuf + 13, enc_out, encslength);
+        BIO_dump_fp(stdout, enc_out, encslength);
+        memcpy(packetbuf + 13, enc_out, encslength);
+        LOG_DEBUG("encleng : %d", encslength);
 #else
         packetbuf[12] = (int)len;
         memcpy(packetbuf + 13, value, (int)len);
 #endif        
     }
-
+    BIO_dump_fp(stdout, packetbuf, 13 + encslength);
     memcpy(*out_packet, packetbuf, 13 + encslength);
+    
+    *outlen = 13 + encslength;
 }
 
 // AC 코드 확인
@@ -1247,10 +1267,6 @@ void make_ac_code(char * senderid, short pn, unsigned char ** out_ac)
     memset(dec_out, 0x00, sizeof(dec_out));
     memset(enc_temp, 0x00, sizeof(enc_temp));
     memset(digest, 0x00, sizeof(digest));
-
-    int enc_pad = 24 - (5 % 24);
-    memset(enc_temp, enc_pad, (5+enc_pad));
-    memcpy(enc_temp, ac, 5);
 
     int encslength = encrypt_block(enc_out, ac, 5, Key, IV);
 
@@ -1497,6 +1513,38 @@ char * hexbuf2buf(const char * hexbuf)
     return resbuf;
 }
 
+
+/*
+← "++++<CR><LF>”
+→ “AT.START<CR><LF>”
+← "AT+ACODE=00 00 00 00<CR><LF>”
+→ “OK<CR><LF>”
+   --> rf모듈과 AT 커맨드를 쓰겠다.
+
+← AT+LST_ID?<CR><LF>
+→ “50 00 1F<CR><LF>”
+   --> 내 아이디를 얻는다.
+
+계측기 ID 리스트 구축
+← AT+LST_ID?<CR><LF> 
+→ “0,30 00 1F<CR><LF>” 
+→ “<CR><LF>”
+   --> 페어링된 아이디 리스트를 얻는다.
+
+← "AT+RST=1<CR><LF>”
+→ “OK<CR><LF>”
+→ ”RDY SW:BA05.0<CR><LF>”
+→ ”BAND:3,CHN:0,DRATE:2,MODE:0<CR><LF>” → ”UNPAIRED<CR><LF>”
+→ ”<CR><LF>”
+   -->무선통신 모드로 전환
+
+
+   페어링 리스트를 확인 없으면 
+   페어링 정보를 얻어다가
+   페어링 정보를 저장 한다.
+   페어링 정보를 서버가 주면 페어링 정보를 AT커맨드로 갱신한다.
+
+*/
 
 #if 0
 // 이전 main code

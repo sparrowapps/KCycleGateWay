@@ -339,6 +339,7 @@ static void handle_uart_request(int fd, char *request) {
             message->message_txt = buf;
             message->uartfd = fd;
             message_queue_write(&uart_w_queue, message);
+            ipc_send_flag = 0;
         }
 
         uart_data[fd].pos = 0;
