@@ -32,10 +32,9 @@
 #define RST 9
 #define PIO 7
 
-#define Expected_OutputMessage_LENGTH 32
-#define CRL_AES192_KEY   24
-#define CRL_AES_BLOCK     16
-#define MAX_DEVICES       256
+#define CRL_AES192_KEY      24
+#define CRL_AES_BLOCK       16
+#define MAX_DEVICES         256
 
 // common variables for threads
 int uart_fd;
@@ -59,7 +58,7 @@ int sock1_cnt[MAX_SOCKET_FD];
 
 int cmd_id = 0; 
 int cmd_state = -1; // 이전 커맨드 id
-int list_end = 0; // 
+int list_end = 0;   // 
 int op_mode = 0;
 int packet_size = 0;
 BYTE grp_id[3] = {0, 0, 0};
@@ -75,6 +74,7 @@ int data_status = 0; // AT 커맨드로 데이터를 처리 할때 data_status 1
 int rst_status = 0;  // AT reset 처리 했을때 1
 int device_idx = 0; 
 
+// 계측기 리스트 
 typedef struct list_id {
     BYTE dev_addr;
     BYTE dev_id[3];
@@ -82,26 +82,6 @@ typedef struct list_id {
 
 list devices[MAX_DEVICES];
 
-#if 1
-#define PLAINTEXT_LENGTH 64
-unsigned char Plaintext[PLAINTEXT_LENGTH] =
-{
-    0x6b, 0xc1, 0xbe, 0xe2, 0x2e, 0x40, 0x9f, 0x96,
-    0xe9, 0x3d, 0x7e, 0x11, 0x73, 0x93, 0x17, 0x2a,
-    0xae, 0x2d, 0x8a, 0x57, 0x1e, 0x03, 0xac, 0x9c,
-    0x9e, 0xb7, 0x6f, 0xac, 0x45, 0xaf, 0x8e, 0x51,
-    0x30, 0xc8, 0x1c, 0x46, 0xa3, 0x5c, 0xe4, 0x11,
-    0xe5, 0xfb, 0xc1, 0x19, 0x1a, 0x0a, 0x52, 0xef,
-    0xf6, 0x9f, 0x24, 0x45, 0xdf, 0x4f, 0x9b, 0x17,
-    0xad, 0x2b, 0x41, 0x7b, 0xe6, 0x6c, 0x37, 0x10
-};
-#else
-#define PLAINTEXT_LENGTH 8
-unsigned char Plaintext[PLAINTEXT_LENGTH] =
-{
-    0x6b, 0xc1, 0xbe, 0xe2, 0x2e, 0x40, 0x9f, 0x96
-};
-#endif
 /* Key to be used for AES encryption/decryption */
 unsigned char Key[CRL_AES192_KEY] =
 {
@@ -110,7 +90,6 @@ unsigned char Key[CRL_AES192_KEY] =
     0x62, 0xf8, 0xea, 0xd2, 0x52, 0x2c, 0x6b, 0x7b,
 };
 
-
 /* Initialization Vector */
 unsigned char IV[CRL_AES_BLOCK] =
 {
@@ -118,59 +97,22 @@ unsigned char IV[CRL_AES_BLOCK] =
     0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f
 };
 
-/* Buffer to store the output data */
-unsigned char OutputMessage[PLAINTEXT_LENGTH];
-
-/* Size of the output data */
-DWORD OutputMessageLength = 0;
-
-#if 1
-unsigned char Expected_Ciphertext[PLAINTEXT_LENGTH + 16] =
-{
-    0x4f, 0x02, 0x1d, 0xb2, 0x43, 0xbc, 0x63, 0x3d,
-    0x71, 0x78, 0x18, 0x3a, 0x9f, 0xa0, 0x71, 0xe8,
-    0xb4, 0xd9, 0xad, 0xa9, 0xad, 0x7d, 0xed, 0xf4,
-    0xe5, 0xe7, 0x38, 0x76, 0x3f, 0x69, 0x14, 0x5a,
-    0x57, 0x1b, 0x24, 0x20, 0x12, 0xfb, 0x7a, 0xe0,
-    0x7f, 0xa9, 0xba, 0xac, 0x3d, 0xf1, 0x02, 0xe0,
-    0x08, 0xb0, 0xe2, 0x79, 0x88, 0x59, 0x88, 0x81,
-    0xd9, 0x20, 0xa9, 0xe6, 0x4f, 0x56, 0x15, 0xcd,
-    0x61, 0x2C, 0xCD, 0x79, 0x22, 0x4B, 0x35, 0x09,
-    0x35, 0xD4, 0x5D, 0xD6, 0xA9, 0x8F, 0x81, 0x76,
-};
-#endif
-
-unsigned char Expected_OutputMessage[] =
-{
-  0x24, 0x8d, 0x6a, 0x61, 0xd2, 0x06, 0x38, 0xb8,
-  0xe5, 0xc0, 0x26, 0x93, 0x0c, 0x3e, 0x60, 0x39,
-  0xa3, 0x3c, 0xe4, 0x59, 0x64, 0xff, 0x21, 0x67,
-  0xf6, 0xec, 0xed, 0xd4, 0x19, 0xdb, 0x06, 0xc1
-};
-
-/*
-enum AT_CMD_TYPE {
-    AT_START = 0,
-
-}
-*/
-
 BYTE cmd_buffer[MAX_CMD][MAX_PACKET_BUFFER] = 
 {
-    "++++\r\n",                        //  0
-    "AT+ACODE=00 00 00 00\r\n",        //  1
-    "AT+MMODE=1\r\n",                //  2
-    "AT+GRP_ID=01 35 46\r\n",        //  3
-    "AT+FBND=3\r\n",                //  4
-    "AT+MADD=0\r\n",                //  5
-    "AT+CHN=5\r\n",                    //  6
-    "AT+BCST=1\r\n",                //  7
-    "AT+DRATE=2\r\n",                //  8
-    "AT+RNDCH=0\r\n",                //  9
-    "AT+PAIR=1\r\n",                // 10
-    "AT+ID?\r\n",                    // 11
-    "AT+RST=1\r\n",                    // 12
-    "AT+LST_ID?\r\n",                // 13
+    "++++\r\n",                         //  0
+    "AT+ACODE=00 00 00 00\r\n",         //  1
+    "AT+MMODE=1\r\n",                   //  2
+    "AT+GRP_ID=01 35 46\r\n",           //  3
+    "AT+FBND=3\r\n",                    //  4
+    "AT+MADD=0\r\n",                    //  5
+    "AT+CHN=5\r\n",                     //  6
+    "AT+BCST=1\r\n",                    //  7
+    "AT+DRATE=2\r\n",                   //  8
+    "AT+RNDCH=0\r\n",                   //  9
+    "AT+PAIR=1\r\n",                    // 10
+    "AT+ID?\r\n",                       // 11
+    "AT+RST=1\r\n",                     // 12
+    "AT+LST_ID?\r\n",                   // 13
     "",
 };
 
@@ -184,7 +126,6 @@ int add_socket(int fd)
         return -1;
     }
 }
-
 
 int del_socket(int fd)
 {
@@ -228,7 +169,6 @@ int mk_fds(fd_set *fds, int fd_max)
     return fd_max;
 }
 
-
 // a simple hex-print routine. could be modified to print 16 bytes-per-line
 static void hex_print(const void* pv, size_t len)
 {
@@ -244,60 +184,12 @@ static void hex_print(const void* pv, size_t len)
     printf("\n");
 }
 
-
-// ============================================================================
-//	openssl 의 ase 알고리즘 test를 위해 작성한 함수
-//	아래에 작성된 것처럼 다음과 같은 순서를 따름
-//	1. 구조체 선언 SSL_OPEN_TO_SERVER
-//	2. SSLOpenToServer() 함수 호출
-//	3. ssl read, write
-//	4. SSLCloseToServer() 함수 호출
-// ============================================================================
-int ssl_test()
-{
-    char msg[1000] =
-"GET /race_sche_Select HTTP/1.1\n\
-Host: localhost:8443\n\
-Connection: keep-alive\n\
-Cache-Control: max-age=0\n\
-Upgrade-Insecure-Requests: 1\n\
-User-Agent: Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36\n\
-Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8\n\
-Accept-Encoding: gzip, deflate, sdch, br\n\
-Accept-Language: ko-KR,ko;q=0.8,en-US;q=0.6,en;q=0.4\n\
-\n\n";
-    char buf[10000];
-    int bytes;
-
-    SSL_OPEN_TO_SERVER sslOpenToServer;
-
-    if (SSLOpenToServer(&sslOpenToServer, "192.168.137.1", "8443") != SSL_OPEN_TO_SERVER_SUCCESS)
-    {
-        puts("SSLOpenToServer fail\n");
-        return -1;
-    }
-
-    SSL_write(sslOpenToServer.ssl, msg, strlen(msg));
-    BIO_dump_fp(stdout, msg, strlen(msg));
-
-    bytes = SSL_read(sslOpenToServer.ssl, buf, sizeof(buf));
-    buf[bytes] = 0;
-    BIO_dump_fp(stdout, buf, bytes);
-
-    SSLCloseToServer(&sslOpenToServer);
-
-    return 0;
-}
-
 // ssl http write 
 int ssl_write(unsigned char * msg, unsigned char ** outmsg, int * outmsglen) {
-
-    //char buf[10000];
     unsigned char * buf;
     int bytes = 0;
 
     SSL_OPEN_TO_SERVER sslOpenToServer;
-
 
     if (SSLOpenToServer(&sslOpenToServer, HTTPS_IP_ADDR, HTTPS_PORT_NUM) != SSL_OPEN_TO_SERVER_SUCCESS)
     {
@@ -305,11 +197,8 @@ int ssl_write(unsigned char * msg, unsigned char ** outmsg, int * outmsglen) {
         return -1;
     }
 
-
     SSL_write(sslOpenToServer.ssl, msg, strlen(msg));
     BIO_dump_fp(stdout, msg, strlen(msg));
-
-   
 
     buf = malloc(MAX_HTTPS_PACKET_BUFFER);
     memset(buf,MAX_HTTPS_PACKET_BUFFER,0x00);
@@ -368,9 +257,6 @@ int open_uart() {
     return uart_fd;
 }
 
-
-
-
 int create_socket (int portnum)
 {
     int fd;
@@ -428,15 +314,6 @@ int read_packet (int fd, int cnt, PBYTE buf, int fd_index)
     }
 }
 
-int check_socket (PBYTE data_buf, WORD size, int fd)
-{
-    //int index;
-    //BYTE chksum;
-    //BYTE mask_field = 0;
-
-    return 0;
-}
-
 int check_rf_data(PBYTE data_buf)
 {
     int index = 0;
@@ -463,7 +340,7 @@ int check_rf_data(PBYTE data_buf)
             if(strcmp(token, AT_OK) == 0)
             {
                 LOG_DEBUG("parse OK\n");
-                cmd_state = 19;
+                cmd_state = _AT_CMD_NONE;
             }
             else if(strcmp(token, TOKEN_BAND) == 0)
             {
@@ -675,21 +552,21 @@ int check_uart (PBYTE data_buf)
     }
     else if(memcmp(data_buf, AT_PAIR, 9) == 0)
     {
-        cmd_id = 19;
-        cmd_state = 19;
+        cmd_id = _AT_CMD_NONE;
+        cmd_state = _AT_CMD_NONE;
         ipc_send_flag = 0;
     }
     else if(memcmp(data_buf, AT_REG_FAIL, 8) == 0)
     {
-        cmd_id = 19;
-        cmd_state = 19;
+        cmd_id = _AT_CMD_NONE;
+        cmd_state = _AT_CMD_NONE;
         ipc_send_flag = 0;
         pair_status = 0;
     }
     else if(memcmp(data_buf, AT_REG_OK, 6) == 0)
     {
-        cmd_id = 19;
-        cmd_state = 19;
+        cmd_id = _AT_CMD_NONE;
+        cmd_state = _AT_CMD_NONE;
         ipc_send_flag = 0;
         pair_status = 1;
     }
@@ -777,8 +654,8 @@ int check_uart (PBYTE data_buf)
                 break;
 
             case _AT_PAIR:
-                cmd_id = 19;
-                cmd_state = 19;
+                cmd_id = _AT_CMD_NONE;
+                cmd_state = _AT_CMD_NONE;
                 ipc_send_flag = 0;
                 pair_status = 1;
                 break;
@@ -866,183 +743,6 @@ int check_uart (PBYTE data_buf)
     return 0;
 }
 
-void aestest()
-{
-    // : 69 ed c1 6b 70
-    //output e7 47 00 f5 64
-    unsigned char ac[] = {0x10, 0x00, 0x27, 0x01, 0x00};
-
-    unsigned char digest[SHA256_DIGEST_LENGTH];
-    unsigned char enc_out[1000];
-    unsigned char dec_out[1000];
-    unsigned char enc_temp[1000];
-
-    memset(digest, 0, sizeof(digest));
-    memset(enc_out, 0, sizeof(enc_out));
-    memset(dec_out, 0, sizeof(dec_out));
-    memset(enc_temp, 0, sizeof(enc_temp));
-
-    // int enc_pad = 16 - (5 % 16);
-    // memset(enc_temp, 11, 16);
-    // memcpy(enc_temp, ac, 5);
-    int encslength = encrypt_block(enc_out, ac, 5, Key, IV);
-
-    BIO_dump_fp(stdout, enc_out, encslength);
-    
-    LOG_DEBUG ("encslength : %d ", encslength  );
-    SHA256_CTX ctx;
-    SHA256_Init(&ctx);
-    SHA256_Update(&ctx, enc_out, encslength);
-    SHA256_Final(digest, &ctx);
-
-    LOG_DEBUG ("%02x %02x %02x %02x %02x   : expected e7 47 00 f5 64 ",digest[27],digest[28],digest[29],digest[30],digest[31]  );
-
-    BIO_dump_fp(stdout, digest, 32); 
-}
-
-void aestest2() {
-    unsigned char enc_out[1000];
-    unsigned char dec_out[1000];
-    unsigned char enc_temp[1000];
-
-    unsigned char plText[1000];
-    memset(plText, 0x00, sizeof(plText));
-    memcpy(plText,"HELLO", 5);
-    
-    memset(enc_out, 0, sizeof(enc_out));
-    int encslength = encrypt_block(enc_out, plText, strlen(plText), Key, IV);
-    BIO_dump_fp(stdout, enc_out, (int)encslength);
-
-    int decslength = decrypt_block(dec_out, enc_out, encslength, Key, IV);
-    BIO_dump_fp(stdout, dec_out, (int)decslength);
-    LOG_DEBUG("AES TEST END");
-}
-
-int rf_data_parser(PBYTE data_buf, int addr)
-{
-    unsigned char *p;
-    p = data_buf;
-    unsigned char code = data_buf[0];
-    unsigned char subcode = data_buf[1];
-    unsigned char ac[10];
-    unsigned char senderid[3];
-    unsigned char packetnumber[2]; //2byte int
-
-    unsigned char * encbuf;
-    
-    p = p + 2;
-    memcpy(ac, p, 10);
-    p = p + 10;
-    unsigned char len = (unsigned char) *(p);
-    p = p + 1;
-    unsigned char * value;
-    unsigned char * plaintextValue;
-    value = malloc((int)len);
-    plaintextValue = malloc((int)len);
-    memset(plaintextValue, 0x00, (int)len);
-    memcpy(value, p, (int)len);
-
-    //varify ac code
-    senderid [0] = ac[0];
-    senderid [1] = ac[1];
-    senderid [2] = ac[2];
-    packetnumber[0] = ac[3];
-    packetnumber[1] = ac[4];
-
-    unsigned short pn = 0;
-    pn = (short)(packetnumber[1] << 8) +  (short)(packetnumber[0]);
-
-    unsigned char digest[SHA256_DIGEST_LENGTH];
-    unsigned char enc_out[1000];
-    unsigned char dec_out[1000];
-    unsigned char enc_temp[1000];
-
-    memset(enc_out, 0, sizeof(enc_out));
-    memset(dec_out, 0, sizeof(dec_out));
-    memset(enc_temp, 0, sizeof(enc_temp));
-
-    int encslength = encrypt_block(enc_out, ac, 5, Key, IV);
-    LOG_DEBUG ("encslength : %d ", encslength  );
-    SHA256_CTX ctx;
-    SHA256_Init(&ctx);
-    SHA256_Update(&ctx, enc_out, encslength);
-    SHA256_Final(digest, &ctx);
-
-#ifdef _PACKET_ENCRYPTY
-    if ( memcmp(ac + 5, digest + 27, 5) != 0 ) {
-        LOG_DEBUG("ac code fail\n");
-        return 0;
-    } 
-#endif
-
-    // value decrypt
-#ifdef _PACKET_ENCRYPTY
-    int decslength = decrypt_block(dec_out, value, (int)len, Key, IV);
-    memcpy(plaintextValue, dec_out, decslength);
-    LOG_DEBUG("plaintext :%s\n", plaintextValue);
-#else
-    memcpy(plaintextValue, value, (int)len);
-    LOG_DEBUG("plaintext :%s\n", plaintextValue);
-#endif
-
-    // 내 아이디를 얻어 놔야 한다.
-
-    //make packet (PING)
-    
-    //make ac;
-    short packetnum = pn + 1;
-
-    //sender id
-    ac[0] = 0x00;
-    ac[1] = 0x00;
-    ac[2] = 0x01;
-    
-    // packet num memcpy로?
-    ac[3] = packetnum % 256;
-    ac[4] = packetnum / 256;
-
-    memset(enc_out, 0, sizeof(enc_out));
-    memset(dec_out, 0, sizeof(dec_out));
-    memset(enc_temp, 0, sizeof(enc_temp));
-    memset(digest, 0x00, sizeof(digest));
-
-    encslength = encrypt_block(enc_out, ac, 5, Key, IV);
-   
-    SHA256_Init(&ctx);
-    SHA256_Update(&ctx, enc_out, encslength);
-    SHA256_Final(digest, &ctx);
-
-    memcpy(ac + 5, digest + 27, 5);
-
-    unsigned char plText[1000];
-    memset(plText, 0x00, sizeof(plText));
-    memcpy(plText,"HELLO", 5);
-    
-    memset(enc_out, 0, sizeof(enc_out));
-#ifdef _PACKET_ENCRYPTY
-    encslength = encrypt_block(enc_out, plText, strlen(plText), Key, IV);
-#else
-    memcpy(enc_out, plText, strlen(plText));
-    encslength = strlen(plText)
-#endif
-    unsigned char packetbuf[MAX_PACKET_BUFFER];
-    packetbuf[0] = 0x02;
-    packetbuf[1] = subcode;
-    memcpy(packetbuf + 2, ac, 10);
-    packetbuf[12] = encslength;
-    memcpy(packetbuf+ 13, enc_out, encslength);
-    LOG_DEBUG("encslength : %d",encslength);
-
-    unsigned char base_encode[MAX_PACKET_BUFFER];
-    memset(base_encode, 0x00, sizeof(base_encode));
-    base64_encode(packetbuf, 13 + encslength, base_encode);
-
-    sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", addr, base_encode); //addr to-do
-    LOG_DEBUG("WRITE : %s",cmd_buffer[_AT_USER_CMD]);
-    cmd_id = _AT_USER_CMD;
-    ipc_send_flag = 1;
-}
-
 int packet_process(unsigned char * inputpacket, int addr)
 {
     char code;
@@ -1063,8 +763,6 @@ int packet_process(unsigned char * inputpacket, int addr)
     memset(base_encode, 0x00, sizeof(base_encode));
 
     // 내아이디 얻기를 해야 함
-
-
 
     if ( extract_packet(inputpacket, &code, &subcode, senderid, &pn, &len, &valuebuf) == 0 ){
         switch (code)

@@ -95,21 +95,22 @@ Content-Type: application/json\n\
 "
 
 typedef enum AT_CMD {
-    _AT_START = 0,
-    _AT_ACODE = 1,
-    _AT_MODE  = 2,
-    _AT_GRP_ID = 3,
-    _AT_FBND  = 4,
-    _AT_MADD  = 5,
-    _AT_CHN   = 6, 
-    _AT_BCST  = 7,
-    _AT_DRATE = 8,
-    _AT_RNDCH = 9,
-    _AT_PAIR  = 10,
-    _AT_ID    = 11,
-    _AT_RST   = 12,
-    _AT_LST_ID = 13,
+    _AT_START   = 0,
+    _AT_ACODE   = 1,
+    _AT_MODE    = 2,
+    _AT_GRP_ID  = 3,
+    _AT_FBND    = 4,
+    _AT_MADD    = 5,
+    _AT_CHN     = 6, 
+    _AT_BCST    = 7,
+    _AT_DRATE   = 8,
+    _AT_RNDCH   = 9,
+    _AT_PAIR    = 10,
+    _AT_ID      = 11,
+    _AT_RST     = 12,
+    _AT_LST_ID  = 13,
     _AT_USER_CMD = 14,
+    _AT_CMD_NONE = 19,
 } AT_CMD_TYPE;
 
 #define PACKET_CMD_PING_R           0x01
@@ -166,7 +167,7 @@ int read_packet (int fd, int cnt, PBYTE buf, int fd_index);
 int check_socket (PBYTE data_buf, WORD size, int fd);
 int check_rf_data(PBYTE data_buf);
 int check_uart (PBYTE data_buf);
-int rf_data_parser(PBYTE data_buf, int addr);
+
 BYTE* hex_decode(char *in, int len, BYTE *out);
 int parse_data (PBYTE data_buf, int *cnt);
 int get_max_fd (int a, int b, int c);
@@ -199,8 +200,6 @@ char * hexbuf2buf(const char * hexbuf);
 int hex2val(const char ch);
 
 int extract_packet (unsigned char * inputpacket, char * outcode, char * outsubcode, char * outsenderid, short * outpn, char * outlen, unsigned char ** outvalue);
-void aestest();
-void aestest2();
 int packet_process(unsigned char * inputpacket, int addr);
 #endif /* _MICOM_H_ */
 

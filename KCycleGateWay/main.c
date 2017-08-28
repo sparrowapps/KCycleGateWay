@@ -7,7 +7,6 @@ Date        : 2017.07.03
 Copyright   : 
 Description : 
 
-
 gateway                     서버
         2BYTE CODE 1SUBCODE AC 10BYTE LENGTH1 = 4 VALUE 4BYTE INT
         00 0 000000000 4 INT4
@@ -28,7 +27,6 @@ gateway                     서버
         {"Result":"Succes"}
         <------------------
 ============================================================================
-
 */
 
 #include <stdio.h>
@@ -49,19 +47,15 @@ gateway                     서버
 #include "micomd.h"
 #include "main.h"
 #include "logger.h"
-
 #include "base64.h"
 #include <jansson.h>
 
-
 // Message queue related code
-
 struct gateway_op {
     enum { OP_WRITE_UART, OP_WRITE_HTTP, OP_READ_SOCKET, OP_READ_UART, OP_EXIT } operation;
     char *message_txt; //
     int socketfd;  //소켓 클라이언트
     int uartfd;    //uart
-
 };
 
 static struct message_queue uart_w_queue;
@@ -88,7 +82,6 @@ static void *uart_write_threadproc(void *dummy) {
             message_queue_message_free(&uart_w_queue, message);
             return NULL;
         }
-        
     }
     return NULL;
 }
@@ -153,7 +146,6 @@ static void threads_init() {
     pthread_create(&uart_read_thread, NULL, &uart_read_threadproc, NULL);
     pthread_create(&http_write_thread, NULL, &http_write_threadproc, NULL);
     pthread_create(&socket_read_thread, NULL, &socket_read_threadproc, NULL);
-    
 }
 
 static void threads_destroy() {
@@ -172,7 +164,6 @@ static void threads_destroy() {
     struct gateway_op *poison_socket = message_queue_message_alloc_blocking(&socket_queue);
     poison_socket->operation = OP_EXIT;
     message_queue_write(&socket_queue, poison_socket);
-
 
     pthread_join(uart_write_thread, NULL);
     pthread_join(uart_read_thread, NULL);
@@ -221,26 +212,6 @@ static void handle_socket_data(int fd) {
 static void handle_socket_request(int fd, char *request) {
     //ack
     unsigned char * buf;
-//     unsigned char msg[1000] =
-// "POST /gateway/hello HTTP/1.1\n\
-// Host: 192.168.11.15:443\n\
-// Connection: keep-alive\n\
-// Cache-Control: max-age=0\n\
-// Upgrade-Insecure-Requests: 1\n\
-// User-Agent: Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36\n\
-// Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8\n\
-// Accept-Encoding: gzip, deflate, sdch, br\n\
-// Accept-Language: ko-KR,ko;q=0.8,en-US;q=0.6,en;q=0.4\n\
-// Cookie: JSESSIONID=5EBE4E35EBC10452C92EC291149B798F\n\
-// Content-Length: 61\n\
-// Content-Type: application/json\n\
-// \n\
-// {\"data\":\"01020304050607080910111213141516171819202122232425\"}\
-// ";
-
-//     unsigned char * msg2;
-
-
     write(fd,"ack\0",4);
     LOG_DEBUG("handle_socket_request ack!\n");
     if(!strncmp(request, "01020304050607080910111213141516171819202122232425", 50)) {
@@ -353,7 +324,6 @@ static void uart_write(int fd,  char *msg) {
     int r = write_packet(fd, msg, strlen(msg));
 }
 
-
 /*
     SSL write 후 응담을 uart로 쏴야 할경우 여기서 처리 해야 한다.
 */
@@ -361,7 +331,6 @@ static void http_write( char *msg, int fd) {
     int outmsglen = 0;
     unsigned char * outmsg = NULL;
     int r = ssl_write( msg, &outmsg, &outmsglen );
-
 
     //uart write
     if (outmsg != NULL) {
@@ -395,7 +364,6 @@ void init_uart_data() {
         uart_data[i].state = UART_INACTIVE;
     }
 }
-
 
 // JSON 만들기
 char * make_json(char * key, char * value) 
@@ -432,21 +400,7 @@ char * from_json(const char * json, char * key)
     return res;
 }
 
-
-
 int main(int argc, char *argv[]) {
-    // e7 47 00 f5 64 : 69 ed c1 6b 70
-    // input  10 00 27 01 00
-    // output e7 47 00 f5 64
-
-    // char * str = make_json("value", "hello");
-
-    // printf("str = %s \n ", str);
-
-    // char * value = from_json("{\"value\": \"hello\"}", "value");
-    // printf("str = %s \n", value);
-    // return 0;
-    aestest2();
 
     main_thread = pthread_self();
     threads_init();
