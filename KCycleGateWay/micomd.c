@@ -407,7 +407,6 @@ int check_rf_data(PBYTE data_buf)
                cmd_state = _AT_USER_CMD;
             }
         }
-        
     }
     else // addr, , packet
     {
@@ -450,7 +449,6 @@ int check_rf_data(PBYTE data_buf)
                     packet_process(base_decode, addr);
                 }
             }
-            
 
             token = strtok(NULL, div);
         }
@@ -743,6 +741,7 @@ int check_uart (PBYTE data_buf)
     return 0;
 }
 
+// wireless protocol packet process entry point
 int packet_process(unsigned char * inputpacket, int addr)
 {
     char code;
@@ -767,7 +766,6 @@ int packet_process(unsigned char * inputpacket, int addr)
     if ( extract_packet(inputpacket, &code, &subcode, senderid, &pn, &len, &valuebuf) == 0 ){
         switch (code)
         {
-            
             case PACKET_CMD_PING_R:
             //todo 내 senderid 를 만들어야 한다.
                 LOG_DEBUG("cmd PACKET_CMD_PING_R");
@@ -788,7 +786,7 @@ int packet_process(unsigned char * inputpacket, int addr)
                 cmd_id = _AT_USER_CMD;
                 break;
         
-            case PACKET_CMD_INSPECTION_R:
+            case PACKET_CMD_INSPECTION_REQ_R:
                 //IR_LINE 성공 여부 기록
                 if (valuebuf[0] == 0) {
                     //바퀴 인식 실패, IR인식 실패
@@ -803,7 +801,7 @@ int packet_process(unsigned char * inputpacket, int addr)
                 //응답 valuebuf ?? --> 0x00
 
                 outpacketlen = 0;
-                make_packet(PACKET_CMD_INSPECTION_S, 0x00, senderid, 0, 1, 0x00, &outpacket, &outpacketlen);
+                make_packet(PACKET_CMD_INSPECTION_REQ_S, 0x00, senderid, 0, 1, 0x00, &outpacket, &outpacketlen);
                 
                 base64_encode(outpacket, outpacketlen , base_encode);
                 
@@ -812,12 +810,12 @@ int packet_process(unsigned char * inputpacket, int addr)
                 cmd_id = _AT_USER_CMD;
                 break;
 
-            case PACKET_CMD_ENCKEYREQMSG_R:
+            case PACKET_CMD_INSPECTION_RES_S:
                 // todo 서버에 인크립션키를 요청 한다. 
 
                 // 응답
                 outpacketlen = 0;
-                make_packet(PACKET_CMD_ENCKEYREQMSG_S, 0x00, senderid, 0, 0, NULL, &outpacket, &outpacketlen);
+                make_packet(PACKET_CMD_INSPECTION_RES_S, 0x00, senderid, 0, 0, NULL, &outpacket, &outpacketlen);
                 
                 base64_encode(outpacket, outpacketlen , base_encode);
                 
@@ -876,7 +874,6 @@ int extract_packet (unsigned char * inputpacket,
         LOG_DEBUG("AC fail \n");
         return -1;
     }
-    
 }
 
 void make_packet(char code, 
@@ -900,8 +897,6 @@ void make_packet(char code,
     make_ac_code(senderid, pn, &ac);
     memcpy(packetbuf + 2, ac, 10);
     free(ac);
-
-    //0 0 ac10 12:len
 
     int encslength = 0;
     if (value != NULL ) {
@@ -943,7 +938,6 @@ int validate_ac(char * senderid, short pn, unsigned char * acbuf)
 }
 
 // AC 코드 생성
-// short = byte[1] << 8 | byte[0] 
 void make_ac_code(char * senderid, short pn, unsigned char ** out_ac)
 {
     unsigned char ac[10];
@@ -1080,7 +1074,6 @@ int get_max_fd (int a, int b, int c) {
     return list[NUM_FD-1];
 }
 
-
 int write_packet (int fd, PBYTE pbuf, int size) {
     int wrtsize = 0;
     int it = 0;
@@ -1121,7 +1114,6 @@ int encrypt_block(unsigned char* cipherText, unsigned char* plainText, unsigned 
 
     ERR_load_crypto_strings();
     EVP_CIPHER_CTX_init(ctx);
-    
 
     if (EVP_EncryptInit(ctx, EVP_aes_192_cbc(), key, ivec) != 1) {
         err = ERR_get_error();
@@ -1134,7 +1126,6 @@ int encrypt_block(unsigned char* cipherText, unsigned char* plainText, unsigned 
         LOG_DEBUG("ERR: EVP_EncryptUpdate() - %s\n", ERR_error_string (err, NULL));
         return -1;
     }
-    
 
     if (EVP_EncryptFinal(ctx, cipherText+orgLen, &addLen) != 1) {
         err = ERR_get_error();
