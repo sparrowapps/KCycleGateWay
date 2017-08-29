@@ -113,6 +113,11 @@ typedef enum AT_CMD {
     _AT_CMD_NONE = 19,
 } AT_CMD_TYPE;
 
+typedef enum DATA_STATUS {
+    _DATA_RF_MODE = 0,
+    _DATA_AT_MODE = 1
+} DATA_STATUS_TYPE;
+
 #define PACKET_CMD_PING_R           0x01
 #define PACKET_CMD_PING_S           0x02
 
@@ -197,5 +202,16 @@ int hex2val(const char ch);
 
 int extract_packet (unsigned char * inputpacket, char * outcode, char * outsubcode, char * outsenderid, short * outpn, char * outlen, unsigned char ** outvalue);
 int packet_process(unsigned char * inputpacket, int addr);
+
+
+extern int list_end;
+extern int cmd_state;
+extern DATA_STATUS_TYPE data_status;
+extern int fd_masks[MAX_SOCKET_FD];
+extern unsigned char cmd_buffer[MAX_CMD][MAX_PACKET_BUFFER];
+extern int cmd_id;
+extern int ipc_send_flag;
+
+
 #endif /* _MICOM_H_ */
 

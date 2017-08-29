@@ -271,13 +271,6 @@ static void handle_uart_data(int fd) {
     handle_uart_request(fd, uart_data[fd].buf);
 }
 
-extern int list_end;
-extern int cmd_state;
-extern int data_status;
-extern int fd_masks[MAX_SOCKET_FD];
-extern unsigned char cmd_buffer[MAX_CMD][MAX_PACKET_BUFFER];
-extern int cmd_id;
-extern int ipc_send_flag;
 static void handle_uart_request(int fd, char *request) {
     // parse and cmd process
     LOG_DEBUG("handle_uart_request : %s\n", request);
@@ -286,16 +279,16 @@ static void handle_uart_request(int fd, char *request) {
     if (parse_data(request , &uart_cnt) == 1) {
         LOG_DEBUG("parse ok  %s uart_cnt %d\n", request,uart_cnt);
 
-        if (uart_cnt >0  || (cmd_state == 13 && list_end == 1) ) {
+        if (uart_cnt >0  || (cmd_state == _AT_LST_ID && list_end == 1) ) {
             LOG_DEBUG("handle_uart_request\n");
-            if (data_status == 0) {
+            if (data_status == _DATA_RF_MODE) {
                 check_rf_data(request);
             } else {
                 check_uart(request);
             }
         }
 
-        // ipc_send_flag : AT 전송 데이터
+        // ipc_send_flag : 데이터 전송
         if (ipc_send_flag == 1) {
             struct gateway_op *message = message_queue_message_alloc_blocking(&uart_w_queue);
             LOG_DEBUG("cmd_id %d\n",cmd_id);
@@ -364,6 +357,11 @@ void init_uart_data() {
         uart_data[i].state = UART_INACTIVE;
     }
 }
+
+// AT cmd 전송 함수 구현 해야 한다.
+
+
+
 
 // JSON 만들기
 char * make_json(char * key, char * value) 

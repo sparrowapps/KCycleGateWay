@@ -58,7 +58,7 @@ int sock1_cnt[MAX_SOCKET_FD];
 
 int cmd_id = 0; 
 int cmd_state = -1; // 이전 커맨드 id
-int list_end = 0;   // 
+int list_end = 0;   // 확인 필요 
 int op_mode = 0;
 int packet_size = 0;
 BYTE grp_id[3] = {0, 0, 0};
@@ -70,7 +70,7 @@ int bcst_status = 0;
 int data_rate = -1;
 int rand_channel = -1;
 int pair_status = 0; // pair 유무 UNPARED 문자 확인 
-int data_status = 0; // AT 커맨드로 데이터를 처리 할때 data_status 1
+DATA_STATUS_TYPE data_status = _DATA_RF_MODE; // AT 커맨드로 데이터를 처리 할때 data_status 1
 int rst_status = 0;  // AT reset 처리 했을때 1
 int device_idx = 0; 
 
@@ -314,6 +314,8 @@ int read_packet (int fd, int cnt, PBYTE buf, int fd_index)
     }
 }
 
+
+// rf data 응답처리
 int check_rf_data(PBYTE data_buf)
 {
     int index = 0;
@@ -389,8 +391,8 @@ int check_rf_data(PBYTE data_buf)
         {
             cmd_id = _AT_START;
             ipc_send_flag = 1;
-            data_status = 1;
-            LOG_DEBUG("send_message = %s , send_flag = %d\n", cmd_buffer[0], ipc_send_flag);
+            data_status = _DATA_AT_MODE;
+            LOG_DEBUG("send_message = %s , send_flag = %d\n", cmd_buffer[_AT_START], ipc_send_flag);
         }
         else 
         {
@@ -398,7 +400,7 @@ int check_rf_data(PBYTE data_buf)
             {
                 ipc_send_flag = 0;
                 rst_status = 0;
-                data_status = 0;
+                data_status = _DATA_RF_MODE;
                 cmd_state = _AT_USER_CMD;
                 LOG_DEBUG("data receiving status................\n");
             }
@@ -430,7 +432,7 @@ int check_rf_data(PBYTE data_buf)
                 {
                     LOG_DEBUG("token = %s\n", token);
                     cmd_id = _AT_USER_CMD;
-                    sprintf(cmd_buffer[14], "%d,ping\r\n", addr);
+                    sprintf(cmd_buffer[cmd_id], "%d,ping\r\n", addr);
                     ipc_send_flag = 1;
                 }
                 else
@@ -457,6 +459,7 @@ int check_rf_data(PBYTE data_buf)
     return 0;
 }
 
+// AT CMD 응답처리
 int check_uart (PBYTE data_buf)
 {
     int index = 0;
@@ -519,7 +522,7 @@ int check_uart (PBYTE data_buf)
         {
             cmd_id = _AT_START;
             ipc_send_flag = 1;
-            LOG_DEBUG("send_message = %s , send_flag = %d\n", cmd_buffer[0], ipc_send_flag);
+            LOG_DEBUG("send_message = %s , send_flag = %d\n", cmd_buffer[cmd_id], ipc_send_flag);
         }
         else 
         {
@@ -527,7 +530,7 @@ int check_uart (PBYTE data_buf)
             {
                 ipc_send_flag = 0;
                 rst_status = 0;
-                data_status = 0;
+                data_status = _DATA_RF_MODE;
                 cmd_state = _AT_USER_CMD;
                 LOG_DEBUG("data receiving status................\n");
             }
@@ -540,7 +543,7 @@ int check_uart (PBYTE data_buf)
     else if(memcmp(data_buf, AT_ST_HEADER, 8) == 0)
     {
         cmd_id = _AT_ACODE;
-        data_status = 1;
+        data_status = _DATA_AT_MODE;
         ipc_send_flag = 1;
     }
     else if(memcmp(data_buf, AT_LOCKED, 6) == 0)
@@ -731,7 +734,7 @@ int check_uart (PBYTE data_buf)
             cmd_id = _AT_RST;
             rst_status = 1;
             list_end = 0;
-            data_status = 0;
+            data_status = _DATA_RF_MODE;
             ipc_send_flag = 1;
         }
     }
@@ -1202,7 +1205,6 @@ char * hexbuf2buf(const char * hexbuf)
     return resbuf;
 }
 
-
 /*
 ← "++++<CR><LF>”
 → “AT.START<CR><LF>”
@@ -1234,224 +1236,3 @@ char * hexbuf2buf(const char * hexbuf)
    페어링 정보를 서버가 주면 페어링 정보를 AT커맨드로 갱신한다.
 
 */
-
-#if 0
-// 이전 main code
-int main (int argc, char *argv[])
-{
-    int maxfd;
-    int state = 0;
-
-    // UART communication variables
-    //int uart_fd;
-    int uart_cnt = 0;
-
-    // select() variables
-    struct timeval tv;
-    fd_set readfds;
-
-    // socket variables for the communication with App Framework
-    int server_sockfd, client_sockfd = 0; 
-    int client_len;
-
-    struct sockaddr_in clientaddr;
-
-    int idx_fd = 0;
-    int ix = 0, i = 0;
-
-    memset(SockBuffer, 0x00, MAX_PACKET_BUFFER);
-    memset(MicomBuffer, 0x00, MAX_PACKET_BUFFER);
-    for(ix = 0; ix < MAX_SOCKET_FD; ix++) {
-        memset(Sock1TempBuf[ix], 0x00, MAX_PACKET_BUFFER);
-        sock1_cnt[ix] = 0;
-    }
-    memset(TempMsgBuf, 0x00, MAX_PACKET_BUFFER);
-    memset(fd_masks, -1, MAX_SOCKET_FD);
-    memset(devices, 0, sizeof(devices));
-
-    client_len = sizeof(clientaddr);
-
-    if(wiringPiSetup() == -1)
-        return -1;
-
-    pinMode(PIO, OUTPUT);
-    pinMode(RST, OUTPUT);
-
-    memset(TempMsgBuf, 0x00, MAX_PACKET_BUFFER);
-
-    // socket for App Framework
-    server_sockfd = create_socket(PORT_NUM);
-
-    // open UART serial port
-    do {
-        uart_fd = uart_open();
-        if (uart_fd < 0) {
-            printf("UART open failed!\n");
-        }
-    } while (uart_fd < 0);
-
-    digitalWrite(PIO, 1);
-    delay(100);
-    digitalWrite(RST, 1);
-    delay(1000);
-    digitalWrite(RST, 0);
-    printf("RST low.............\n");
-    delay(1000);
-    digitalWrite(RST, 1);
-    printf("RST high.............\n");
-    ipc_send_flag = 0;
-#if 0
-    unsigned char digest[SHA256_DIGEST_LENGTH];
-    const char* string = "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
-
-    SHA256_CTX ctx;
-    SHA256_Init(&ctx);
-    SHA256_Update(&ctx, string, strlen(string));
-    SHA256_Final(digest, &ctx);
-
-    char mdString[SHA256_DIGEST_LENGTH*2+1];
-    for (i = 0; i < SHA256_DIGEST_LENGTH; i++)
-        sprintf(&mdString[i*2], "%02x", (unsigned int)digest[i]);
-
-    printf("SHA256 digest   : %s\n", mdString);
-
-    memset(mdString, 0, SHA256_DIGEST_LENGTH*2+1);
-    for (i = 0; i < sizeof(Expected_OutputMessage); i++)
-        sprintf(&mdString[i*2], "%02x", (unsigned int)Expected_OutputMessage[i]);
-
-    printf("SHA256 expected : %s \n", mdString);
-
-    // buffers for encryption and decryption
-    //size_t encslength = ((PLAINTEXT_LENGTH + AES_BLOCK_SIZE) / AES_BLOCK_SIZE) * AES_BLOCK_SIZE;
-    unsigned char enc_out[1000];
-    unsigned char dec_out[1000];
-    unsigned char enc_temp[1000];
-    memset(enc_out, 0, sizeof(enc_out));
-    memset(dec_out, 0, sizeof(dec_out));
-    memset(enc_temp, 0, sizeof(enc_temp));
-
-    int encslength = encrypt_block(enc_out, Plaintext, PLAINTEXT_LENGTH, Key, IV);
-    printf("encryption length = %d .............. \n", encslength);
-    memcpy(enc_temp, enc_out, encslength);
-    int decslength = decrypt_block(dec_out, enc_temp, encslength, Key, IV);
-    printf("decryption length = %d .............. \n", decslength);
-
-    printf("original:\t");
-    hex_print(Plaintext, PLAINTEXT_LENGTH);
-
-    printf("encrypt :\t");
-    hex_print(enc_out, encslength);
-
-    printf("expected:\t");
-    hex_print(Expected_Ciphertext, PLAINTEXT_LENGTH);
-
-    printf("decrypt:\t");
-    hex_print(dec_out, decslength);
-#endif
-
-    while (1) {
-        pthread_mutex_lock(&mutex);
-
-        FD_ZERO(&readfds);
-        if (server_sockfd) FD_SET(server_sockfd, &readfds);
-        if (uart_fd) FD_SET(uart_fd, &readfds);
-        maxfd = get_max_fd(server_sockfd, uart_fd, 0);
-        maxfd = mk_fds(&readfds, maxfd);
-
-        pthread_mutex_unlock(&mutex);
-
-        // save select timeout
-        tv.tv_sec = 0;
-        tv.tv_usec = 500000;
-
-        // wait fd event
-        state = select(maxfd + 1, &readfds, (fd_set *)0, (fd_set *)0, &tv);
-
-        switch (state) {
-            case -1:
-                printf("Select function error!\n");
-                continue;
-
-            case 0:
-#if 1
-                //printf("communicate with uart...[fd:%d, cmd_buffer[%d]: %s] send_flag = %d.... \n", uart_fd, strlen((char *)cmd_buffer[cmd_id]), (char *)cmd_buffer[cmd_id], ipc_send_flag);
-                if(ipc_send_flag == 1) {
-                    if(uart_fd > 0) {
-                        printf("send to uart...[fd:%d, cmd_buffer[%d]: %s].... \n", uart_fd, strlen((char *)cmd_buffer[cmd_id]), (char *)cmd_buffer[cmd_id]);
-                        write_packet(uart_fd, cmd_buffer[cmd_id], strlen((char *)cmd_buffer[cmd_id]));
-                        cmd_state = cmd_id;
-                        printf("communicate with uart...[fd:%d, fd count: %d].... \n", uart_fd, cnt_fd_socket);
-                    } else {
-                        printf("fail to communicate with uart...[fd:%d, fd count:%d].... \n", uart_fd, cnt_fd_socket);
-                    }
-                    ipc_send_flag = 0;
-                } else {
-                    ipc_send_wait = 0;
-                }
-#endif
-
-                if(ssl_send_flag == 1) {
-                    printf("send to https ssl...................\n");
-                    ssl_test();
-                    ssl_send_flag = 0;
-                }
-                continue;
-
-            default:
-                if (FD_ISSET(server_sockfd, &readfds)) {
-                    // accept a connection on a socket
-                    client_sockfd = accept(server_sockfd, (struct sockaddr *)&clientaddr, &client_len);
-
-                    if (client_sockfd < 0) {
-                        printf("Failed to accept the connection request from App Framework!\n");
-                    } else {
-                        //client_sockfd_flag = 1;
-                        if(add_socket(client_sockfd) == -1) {
-                            printf("Failed to add socket because of the number of socket(%d) !! \n", cnt_fd_socket);
-                        } else {
-                            //client_fd = client_sockfd;
-                            printf("App Framework socket connected[fd = %d, cnt_fd = %d]!!!\n", client_sockfd, cnt_fd_socket);
-                        }
-                    }
-                }
-                if (FD_ISSET(uart_fd, &readfds))
-                {
-                    pthread_mutex_lock(&mutex);
-                    uart_cnt = read_packet(uart_fd, uart_cnt, TempMsgBuf, UART);
-                    ipc_send_wait = 0;
-                    pthread_mutex_unlock(&mutex);
-
-                    if(parse_data(TempMsgBuf, &uart_cnt) == 1)
-                    {
-                        printf("read from uart...[fd:%d, recv_buffer[%d:%d]: %s].... \n", uart_fd, uart_cnt, strlen((char *)TempMsgBuf), (char *)TempMsgBuf);
-
-                        if(uart_cnt > 0 || (cmd_state == 13 && list_end == 1)) {
-                            if(data_status == 0)
-                            {
-                                check_rf_data(TempMsgBuf);
-                            }
-                            else
-                            {
-                                check_uart (TempMsgBuf);
-                            }
-                            memset(TempMsgBuf, 0, sizeof(TempMsgBuf));
-                            uart_cnt = 0;
-                        }
-                    }
-                }
-        }
-    }
-
-    for(idx_fd = 0; idx_fd < cnt_fd_socket; idx_fd++)
-    {
-        del_socket(fd_masks[idx_fd]);
-    }
-
-    close(server_sockfd);
-    uart_close(uart_fd);
-
-    printf("End of GateWay Daemon!\n");
-
-    return 0;
-}
-#endif
