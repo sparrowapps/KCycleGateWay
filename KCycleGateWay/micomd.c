@@ -69,9 +69,9 @@ int rf_channel = -1;
 int bcst_status = 0;
 int data_rate = -1;
 int rand_channel = -1;
-int pair_status = 0; // pair 유무 UNPARED 문자 확인 
+PAIR_STATUS_TYPE pair_status = _UNPAIRED; // pair 유무 UNPARED 문자 확인 
 DATA_STATUS_TYPE data_status = _DATA_RF_MODE; // AT 커맨드로 데이터를 처리 할때 data_status 1
-int rst_status = 0;  // AT reset 처리 했을때 1
+RESET_STATUS_TYPE rst_status = _RESET_NONE;  // AT reset 처리 했을때 1
 int device_idx = 0; 
 
 // 계측기 리스트 
@@ -320,20 +320,20 @@ int check_rf_data(PBYTE data_buf)
 {
     int index = 0;
 
-    if(memcmp(data_buf, AT_PAIR, 9) == 0)
+    if(memcmp(data_buf, AT_PAIR, strlen(AT_PAIR)) == 0)
     {
         LOG_DEBUG("parse REG.START\n");
     }
-    else if(memcmp(data_buf, TOKEN_TGT, 3) == 0)
+    else if(memcmp(data_buf, TOKEN_TGT, strlen(TOKEN_TGT)) == 0)
     {
         LOG_DEBUG("parse TGT\n");
     }
-    else if(memcmp(data_buf, HEADER, 6) == 0 || memcmp(data_buf, AT_OK, 2) == 0)
+    else if(memcmp(data_buf, HEADER, strlen(HEADER)) == 0 || memcmp(data_buf, AT_OK, strlen(AT_OK)) == 0)
     {
         char* token = NULL;
         char div[] = ",:\r\n";
 
-        pair_status = 1;
+        pair_status = _PAIRED;
 
         token = strtok((char *)data_buf, div);
         while(token != NULL)
@@ -362,7 +362,7 @@ int check_rf_data(PBYTE data_buf)
             }
             else if(strcmp(token, TOKEN_UNPAIR) == 0)
             {
-                pair_status = 0;
+                pair_status = _UNPAIRED;
             }
             else
             {
@@ -396,10 +396,10 @@ int check_rf_data(PBYTE data_buf)
         }
         else 
         {
-            if(rst_status == 1)
+            if(rst_status == _RESET_STATUS)
             {
                 ipc_send_flag = 0;
-                rst_status = 0;
+                rst_status = _RESET_NONE;
                 data_status = _DATA_RF_MODE;
                 cmd_state = _AT_USER_CMD;
                 LOG_DEBUG("data receiving status................\n");
@@ -428,7 +428,7 @@ int check_rf_data(PBYTE data_buf)
             }
             else {
                 LOG_DEBUG("token = %s\n", token);
-                if(memcmp(token, PING_CHECK, 4) == 0)
+                if(memcmp(token, PING_CHECK, strlen(PING_CHECK)) == 0)
                 {
                     LOG_DEBUG("token = %s\n", token);
                     cmd_id = _AT_USER_CMD;
@@ -464,12 +464,12 @@ int check_uart (PBYTE data_buf)
 {
     int index = 0;
 
-    if(memcmp(data_buf, HEADER, 6) == 0)
+    if(memcmp(data_buf, HEADER, strlen(HEADER)) == 0)
     {
         char* token = NULL;
         char div[] = ",:\r\n";
 
-        pair_status = 1;
+        pair_status = _PAIRED;
 
         token = strtok((char *)data_buf, div);
         while(token != NULL)
@@ -493,7 +493,7 @@ int check_uart (PBYTE data_buf)
             }
             else if(strcmp(token, TOKEN_UNPAIR) == 0)
             {
-                pair_status = 0;
+                pair_status = _UNPAIRED;
             }
             else
             {
@@ -526,63 +526,64 @@ int check_uart (PBYTE data_buf)
         }
         else 
         {
-            if(rst_status == 1)
+            if(rst_status == _RESET_STATUS)
             {
                 ipc_send_flag = 0;
-                rst_status = 0;
+                rst_status = _RESET_NONE;
                 data_status = _DATA_RF_MODE;
                 cmd_state = _AT_USER_CMD;
                 LOG_DEBUG("data receiving status................\n");
             }
             else
             {
+                // 여기서 다음 스텝으로 진행 할것을 처리 해야 할듯 하다.
                 cmd_state = _AT_USER_CMD;
             }
         }
     }
-    else if(memcmp(data_buf, AT_ST_HEADER, 8) == 0)
+    else if(memcmp(data_buf, AT_ST_HEADER, strlen(AT_ST_HEADER)) == 0)
     {
         cmd_id = _AT_ACODE;
         data_status = _DATA_AT_MODE;
         ipc_send_flag = 1;
     }
-    else if(memcmp(data_buf, AT_LOCKED, 6) == 0)
+    else if(memcmp(data_buf, AT_LOCKED, strlen(AT_LOCKED)) == 0)
     {
         cmd_id = _AT_ACODE;
         ipc_send_flag = 1;
     }
-    else if(memcmp(data_buf, AT_PAIR, 9) == 0)
+    else if(memcmp(data_buf, AT_PAIR, strlen(AT_PAIR)) == 0)
     {
         cmd_id = _AT_CMD_NONE;
         cmd_state = _AT_CMD_NONE;
         ipc_send_flag = 0;
     }
-    else if(memcmp(data_buf, AT_REG_FAIL, 8) == 0)
+    else if(memcmp(data_buf, AT_REG_FAIL, strlen(AT_REG_FAIL)) == 0)
     {
         cmd_id = _AT_CMD_NONE;
         cmd_state = _AT_CMD_NONE;
         ipc_send_flag = 0;
-        pair_status = 0;
+        pair_status = _UNPAIRED;
     }
-    else if(memcmp(data_buf, AT_REG_OK, 6) == 0)
+    else if(memcmp(data_buf, AT_REG_OK, strlen(AT_REG_OK)) == 0)
     {
         cmd_id = _AT_CMD_NONE;
         cmd_state = _AT_CMD_NONE;
         ipc_send_flag = 0;
-        pair_status = 1;
+        pair_status = _PAIRED;
     }
-    else if(memcmp(data_buf, AT_OK, 2) == 0)
+    else if(memcmp(data_buf, AT_OK, strlen(AT_OK)) == 0)
     {
         switch(cmd_state)
         {
             case _AT_ACODE:
 #if 1
-                if(pair_status == 1)
+                if(pair_status == _PAIRED)
                 {
                     cmd_id = _AT_LST_ID;
                     ipc_send_flag = 1;
                     device_idx = 0;
-                    //rst_status = 1;
+                    //rst_status = _RESET_STATUS;
                 }
                 else
 #endif
@@ -595,12 +596,12 @@ int check_uart (PBYTE data_buf)
             case _AT_MODE:
                 op_mode = 1;
 #if 0
-                if(pair_status == 1)
+                if(pair_status == _PAIRED)
                 {
                     cmd_id = 13;
                     ipc_send_flag = 1;
                     device_idx = 0;
-                    //rst_status = 1;
+                    //rst_status = _RESET_STATUS;
                 }
                 else
 #endif
@@ -658,7 +659,7 @@ int check_uart (PBYTE data_buf)
                 cmd_id = _AT_CMD_NONE;
                 cmd_state = _AT_CMD_NONE;
                 ipc_send_flag = 0;
-                pair_status = 1;
+                pair_status = _PAIRED;
                 break;
 
             case _AT_ID:
@@ -732,7 +733,7 @@ int check_uart (PBYTE data_buf)
             }
 
             cmd_id = _AT_RST;
-            rst_status = 1;
+            rst_status = _RESET_STATUS;
             list_end = 0;
             data_status = _DATA_RF_MODE;
             ipc_send_flag = 1;
@@ -1049,7 +1050,7 @@ int parse_data (PBYTE data_buf, int *cnt)
         }
         else
         {
-            if(memcmp(data_buf, AT_ST_HEADER, 8) == 0)
+            if(memcmp(data_buf, AT_ST_HEADER, strlen(AT_ST_HEADER)) == 0)
             {
                 LOG_DEBUG("parse_data ===> cmd_state[%d], index[%d]\n", cmd_state, index);
                 return 1;

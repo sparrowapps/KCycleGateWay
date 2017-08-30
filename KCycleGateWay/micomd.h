@@ -118,6 +118,16 @@ typedef enum DATA_STATUS {
     _DATA_AT_MODE = 1
 } DATA_STATUS_TYPE;
 
+typedef enum PAIR_STATUS {
+    _UNPAIRED = 0,
+    _PAIRED = 1,
+} PAIR_STATUS_TYPE;
+
+typedef enum REST_STATUS {
+    _RESET_NONE = 0,
+    _RESET_STATUS = 1,
+} RESET_STATUS_TYPE;
+
 #define PACKET_CMD_PING_R           0x01
 #define PACKET_CMD_PING_S           0x02
 
