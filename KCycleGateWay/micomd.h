@@ -94,6 +94,37 @@ Content-Type: application/json\n\
 {\"data\":\"01020304050607080910111213141516171819202122232425\"}\
 "
 
+
+//HTTPS 헤더 뼈다귀 url, IP, PORT, json string
+#define HTTPS_HEADER "POST %s HTTP/1.1\n\
+Host: %s:%s\n\
+Connection: keep-alive\n\
+Cache-Control: max-age=0\n\
+Upgrade-Insecure-Requests: 1\n\
+User-Agent: Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36\n\
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8\n\
+Accept-Encoding: gzip, deflate, sdch, br\n\
+Accept-Language: ko-KR,ko;q=0.8,en-US;q=0.6,en;q=0.4\n\
+Cookie: JSESSIONID=5EBE4E35EBC10452C92EC291149B798F\n\
+Content-Length: 61\n\
+Content-Type: application/json\n\
+\n\
+%s\
+"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 typedef enum AT_CMD {
     _AT_START   = 0,
     _AT_ACODE   = 1,

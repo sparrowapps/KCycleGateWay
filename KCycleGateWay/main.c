@@ -50,6 +50,14 @@ gateway                     서버
 #include "base64.h"
 #include <jansson.h>
 
+// function prototype
+static void handle_uart_data(int fd);
+static void handle_uart_request(int fd, char *request);
+static void handle_socket_data(int fd);
+static void handle_socket_request(int fd, char *request);
+static void uart_write(int fd, char *msg);
+static void http_write( char *msg, int fd);
+
 // Message queue related code
 struct gateway_op {
     enum { OP_WRITE_UART, OP_WRITE_HTTP, OP_READ_SOCKET, OP_READ_UART, OP_EXIT } operation;
@@ -68,6 +76,8 @@ static pthread_t socket_read_thread;
 static pthread_t uart_read_thread; 
 static pthread_t uart_write_thread;
 static pthread_t http_write_thread;
+
+static int SSLCMD = 0;
 
 static void *uart_write_threadproc(void *dummy) {
     LOG_DEBUG("uart_write_threadproc start\n");
@@ -209,6 +219,7 @@ static void handle_socket_data(int fd) {
     }
 }
 
+// 소켓 리케스트 처리
 static void handle_socket_request(int fd, char *request) {
     //ack
     unsigned char * buf;
@@ -325,7 +336,7 @@ static void http_write( char *msg, int fd) {
     unsigned char * outmsg = NULL;
     int r = ssl_write( msg, &outmsg, &outmsglen );
 
-    //uart write
+    //ssl 응답을 처리 하는 함수 
     if (outmsg != NULL) {
 
         // 받은 메세지를 uart로 쏠때
@@ -334,6 +345,7 @@ static void http_write( char *msg, int fd) {
         // message->message_txt = outmsg;
         // message->uartfd = fd;
         // message_queue_write(&uart_w_queue, message);
+        /*
         if ( strstr(outmsg, "allOff") != NULL ) {
             LOG_DEBUG("send off message to all DEVICE \n");
             LOG_DEBUG("OK response from DEVICE\n");
@@ -347,6 +359,14 @@ static void http_write( char *msg, int fd) {
             message->message_txt = buf;
             message_queue_write(&https_queue, message);  
         }
+        */
+
+        //jason parsing
+
+
+
+
+
 
         free(outmsg);
     }    
@@ -500,4 +520,33 @@ int main(int argc, char *argv[]) {
     } else {
         perror("Error listening on uart or socket");
     }
+}
+
+
+
+/*
+url , 전달 데이터를 주면 서버에 
+SSL request JSON을 포함해서 전송 한다.
+value 가 없을 경우 데이터 없이 전송 한다.
+*/
+void SSLServerSend(char *url, char *value, int valuelen) {
+
+    unsigned char * buf;
+    unsigned char base_encode[MAX_PACKET_BUFFER];
+
+    struct gateway_op *message = message_queue_message_alloc_blocking(&https_queue);
+    message->operation = OP_WRITE_HTTP;
+    buf = malloc(MAX_HTTPS_PACKET_BUFFER);
+
+    if (value != NULL) {
+        memset(base_encode, 0x00, sizeof(base_encode));
+        base64_encode(value, valuelen , base_encode);
+        char *json = make_json("Value", base_encode);
+        sprintf(buf, HTTPS_HEADER, url,  HTTPS_IP_ADDR, HTTPS_PORT_NUM, json);
+    } else {
+        sprintf(buf, HTTPS_HEADER, url,  HTTPS_IP_ADDR, HTTPS_PORT_NUM, "");
+    }
+
+    message->message_txt = buf;
+    message_queue_write(&https_queue, message);
 }

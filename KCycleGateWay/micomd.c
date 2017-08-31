@@ -750,7 +750,7 @@ int packet_process(unsigned char * inputpacket, int addr)
 {
     char code;
     char subcode;
-    char senderid[3];
+
     short pn;
     char len;
     unsigned char * valuebuf;
@@ -767,18 +767,19 @@ int packet_process(unsigned char * inputpacket, int addr)
 
     // 내아이디 얻기를 해야 함
 
-    if ( extract_packet(inputpacket, &code, &subcode, senderid, &pn, &len, &valuebuf) == 0 ){
+    if ( extract_packet(inputpacket, &code, &subcode, dev_id, &pn, &len, &valuebuf) == 0 ){
         switch (code)
         {
             case PACKET_CMD_PING_R:
             //todo 내 senderid 를 만들어야 한다.
                 LOG_DEBUG("cmd PACKET_CMD_PING_R");
+
+                //서버 전송 리퀘스트
+                SSLServerSend("/gateway/ping", valuebuf, len);
+
                 outpacketlen = 0;
 
-                senderid[0] = 0x00;
-                senderid[1] = 0x00;
-                senderid[2] = 0x01;
-                make_packet(PACKET_CMD_PING_S, 0x00, senderid, 0, 5, "HELLO", &outpacket, &outpacketlen);
+                make_packet(PACKET_CMD_PING_S, 0x00, dev_id, 0, 5, "HELLO", &outpacket, &outpacketlen);
                 
                 BIO_dump_fp(stdout, outpacket, outpacketlen);
                 
@@ -805,7 +806,7 @@ int packet_process(unsigned char * inputpacket, int addr)
                 //응답 valuebuf ?? --> 0x00
 
                 outpacketlen = 0;
-                make_packet(PACKET_CMD_INSPECTION_REQ_S, 0x00, senderid, 0, 1, 0x00, &outpacket, &outpacketlen);
+                make_packet(PACKET_CMD_INSPECTION_REQ_S, 0x00, dev_id, 0, 1, 0x00, &outpacket, &outpacketlen);
                 
                 base64_encode(outpacket, outpacketlen , base_encode);
                 
@@ -819,7 +820,7 @@ int packet_process(unsigned char * inputpacket, int addr)
 
                 // 응답
                 outpacketlen = 0;
-                make_packet(PACKET_CMD_INSPECTION_RES_S, 0x00, senderid, 0, 0, NULL, &outpacket, &outpacketlen);
+                make_packet(PACKET_CMD_INSPECTION_RES_S, 0x00, dev_id, 0, 0, NULL, &outpacket, &outpacketlen);
                 
                 base64_encode(outpacket, outpacketlen , base_encode);
                 
