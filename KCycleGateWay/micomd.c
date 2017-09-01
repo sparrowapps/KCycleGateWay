@@ -29,12 +29,6 @@
 #include "logger.h"
 #include "base64.h"
 
-#define RST 9
-#define PIO 7
-
-#define CRL_AES192_KEY      24
-#define CRL_AES_BLOCK       16
-#define MAX_DEVICES         256
 
 // common variables for threads
 int uart_fd;
@@ -313,7 +307,6 @@ int read_packet (int fd, int cnt, PBYTE buf, int fd_index)
         return -1;
     }
 }
-
 
 // rf data 응답처리
 int check_rf_data(PBYTE data_buf)
@@ -753,13 +746,9 @@ int packet_process(unsigned char * inputpacket, int addr)
 
     short pn;
     char len;
-    unsigned char * valuebuf;
-    unsigned char * outpacket;
-
-    valuebuf = malloc(MAX_PACKET_BYTE);
-    outpacket = malloc(MAX_PACKET_BUFFER);
+    unsigned char valuebuf[MAX_PACKET_BYTE];
     memset(valuebuf, 0x00, MAX_PACKET_BYTE);
-    memset(outpacket, 0x00, MAX_PACKET_BUFFER);
+    
     int outpacketlen = 0;
 
     unsigned char base_encode[MAX_PACKET_BUFFER];
@@ -775,68 +764,63 @@ int packet_process(unsigned char * inputpacket, int addr)
                 LOG_DEBUG("cmd PACKET_CMD_PING_R");
 
                 //서버 전송 리퀘스트
-                SSLServerSend("/gateway/ping", valuebuf, len);
-
-                outpacketlen = 0;
-
-                make_packet(PACKET_CMD_PING_S, 0x00, dev_id, 0, 5, "HELLO", &outpacket, &outpacketlen);
-                
-                BIO_dump_fp(stdout, outpacket, outpacketlen);
-                
-                base64_encode(outpacket, outpacketlen , base_encode);
-                LOG_DEBUG("outpacketlen : %d", outpacketlen);
-                ipc_send_flag = 1;
-                sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", addr, base_encode);
-                LOG_DEBUG("cmd_buffer : %s", cmd_buffer[_AT_USER_CMD]);
-                cmd_id = _AT_USER_CMD;
+                SSLServerSend("/gateway/ping", valuebuf, len, addr);
                 break;
-        
-            case PACKET_CMD_INSPECTION_REQ_R:
-                //IR_LINE 성공 여부 기록
-                if (valuebuf[0] == 0) {
-                    //바퀴 인식 실패, IR인식 실패
-                } else if (valuebuf[0] == 1) {
-                    //바퀴 인식 성공, IR인식 실패
-                } else if (valuebuf[0] == 2) {
-                    //바퀴 인식 실패, IR인식 성공
-                } else {
-                    //성공, 성공
-                }
-
-                //응답 valuebuf ?? --> 0x00
-
-                outpacketlen = 0;
-                make_packet(PACKET_CMD_INSPECTION_REQ_S, 0x00, dev_id, 0, 1, 0x00, &outpacket, &outpacketlen);
-                
-                base64_encode(outpacket, outpacketlen , base_encode);
-                
-                ipc_send_flag = 1;
-                sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", addr, base_encode);
-                cmd_id = _AT_USER_CMD;
+            
+            case PACKET_CMD_INSPECTION_RES_R:
+                LOG_DEBUG("cmd PACKET_CMD_INSPECTION_RES_R");
+            
+                SSLServerSend("/gateway/inspectionResult", valuebuf, len, addr);
                 break;
 
-            case PACKET_CMD_INSPECTION_RES_S:
-                // todo 서버에 인크립션키를 요청 한다. 
+            case PACKET_CMD_ENCKEY_REQ_R:
+                LOG_DEBUG("cmd PACKET_CMD_ENCKEY_REQ_R");
+            
+                SSLServerSend("/gateway/encryptionKeyRequest", valuebuf, len, addr);
+                break;
 
-                // 응답
-                outpacketlen = 0;
-                make_packet(PACKET_CMD_INSPECTION_RES_S, 0x00, dev_id, 0, 0, NULL, &outpacket, &outpacketlen);
-                
-                base64_encode(outpacket, outpacketlen , base_encode);
-                
-                ipc_send_flag = 1;
-                sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", addr, base_encode);
-                cmd_id = _AT_USER_CMD;
-                break;                
+            case PACKET_CMD_LOGCHK_R:
+                LOG_DEBUG("cmd PACKET_CMD_LOGCHK_R");
+            
+                SSLServerSend("/gateway/logCheckMessage", valuebuf, len, addr);
+                break;
 
+            case PACKET_CMD_ERRORCHK_R:
+                LOG_DEBUG("cmd PACKET_CMD_ERRORCHK_R");
+            
+                SSLServerSend("/gateway/errorCheck", valuebuf, len, addr);
+                break;
+
+            case PACKET_CMD_DASHRESULT_R:
+                LOG_DEBUG("cmd PACKET_CMD_DASHRESULT_R");
+            
+                SSLServerSend("/gateway/dashResult", valuebuf, len, addr);
+                break;
+
+            case PACKET_CMD_RACESTATECHK_R:
+                LOG_DEBUG("cmd PACKET_CMD_RACESTATECHK_R");
+            
+                SSLServerSend("/gateway/raceStateCheck", valuebuf, len, addr);
+                break;
+
+            case PACKET_CMD_RACELINERESULT_R:
+                LOG_DEBUG("cmd PACKET_CMD_RACELINERESULT_R");
+            
+                SSLServerSend("/gateway/raceLineResult", valuebuf, len, addr);
+                break;
+
+            case PACKET_CMD_RACECYCLESULT_R:
+                //todo buffering 로직 필요
+                LOG_DEBUG("cmd PACKET_CMD_RACECYCLESULT_R");
+            
+                SSLServerSend("/gateway/raceCycleResult", valuebuf, len, addr);
+                break;
+                
             default:
                 //nothing todo
                 break;
         }
     }
-
-    free(valuebuf);
-    free(outpacket);
     return 0;
 }
 
@@ -915,11 +899,15 @@ void make_packet(char code,
         packetbuf[12] = (int)len;
         memcpy(packetbuf + 13, value, (int)len);
 #endif        
-    }
     BIO_dump_fp(stdout, packetbuf, 13 + encslength);
     memcpy(*out_packet, packetbuf, 13 + encslength);
-    
+
     *outlen = 13 + encslength;
+
+    } else {
+        packetbuf[12] = 0;
+        *outlen = 13;
+    }
 }
 
 // AC 코드 확인

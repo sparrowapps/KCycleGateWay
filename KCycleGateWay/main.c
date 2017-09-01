@@ -56,7 +56,9 @@ static void handle_uart_request(int fd, char *request);
 static void handle_socket_data(int fd);
 static void handle_socket_request(int fd, char *request);
 static void uart_write(int fd, char *msg);
-static void http_write( char *msg, int fd);
+static void http_write( char *msg, int fd, int modem_addr);
+static json_t *load_json(const char *jason);
+static char * from_json(const char * json, char * key);
 
 // Message queue related code
 struct gateway_op {
@@ -64,6 +66,7 @@ struct gateway_op {
     char *message_txt; //
     int socketfd;  //소켓 클라이언트
     int uartfd;    //uart
+    int addr; // 모뎀 어드레스 
 };
 
 static struct message_queue uart_w_queue;
@@ -102,7 +105,7 @@ static void *http_write_threadproc(void *dummy) {
         struct gateway_op *message = message_queue_read(&https_queue);
         if ( message->operation == OP_WRITE_HTTP ) { 
             LOG_DEBUG("message->operation == OP_WRITE_HTTP\n");
-            http_write( message->message_txt , message->uartfd);
+            http_write( message->message_txt , message->uartfd, message->addr);
             free((void *)message->message_txt);
             message_queue_message_free(&https_queue, message);
         } else if ( message->operation == OP_EXIT ) {
@@ -113,7 +116,7 @@ static void *http_write_threadproc(void *dummy) {
     return NULL;
 }
 
-extern int cnt_fd_socket;
+
 static void *socket_read_threadproc(void *dummy) {
     LOG_DEBUG("socket_read_threadproc start\n");
     while (1)  {
@@ -220,6 +223,7 @@ static void handle_socket_data(int fd) {
 }
 
 // 소켓 리케스트 처리
+// 패턴2 서버에서 소켓으로 먼저 리퀘스트가 올때 whatIsMyjob ssl 전송을 해야 한다.
 static void handle_socket_request(int fd, char *request) {
     //ack
     unsigned char * buf;
@@ -331,38 +335,90 @@ static void uart_write(int fd,  char *msg) {
 /*
     SSL write 후 응담을 uart로 쏴야 할경우 여기서 처리 해야 한다.
 */
-static void http_write( char *msg, int fd) {
+static void http_write( char *msg, int fd, int modem_addr) {
     int outmsglen = 0;
     unsigned char * outmsg = NULL;
     int r = ssl_write( msg, &outmsg, &outmsglen );
 
+    unsigned char base_decode[MAX_PACKET_BUFFER];
+    unsigned char base_encode[MAX_PACKET_BUFFER];
+    unsigned char outpacket[MAX_PACKET_BUFFER];
+    memset(base_decode, 0x00, sizeof(base_decode));
+    memset(base_encode, 0x00, sizeof(base_encode));
+    memset(outpacket, 0x00, sizeof(base_encode));
+
     //ssl 응답을 처리 하는 함수 
     if (outmsg != NULL) {
 
-        // 받은 메세지를 uart로 쏠때
-        // struct gateway_op *message = message_queue_message_alloc_blocking(&uart_w_queue);
-        // message->operation = OP_WRITE_UART;
-        // message->message_txt = outmsg;
-        // message->uartfd = fd;
-        // message_queue_write(&uart_w_queue, message);
-        /*
-        if ( strstr(outmsg, "allOff") != NULL ) {
-            LOG_DEBUG("send off message to all DEVICE \n");
-            LOG_DEBUG("OK response from DEVICE\n");
+        char * res = from_json(outmsg, "Result");
+
+        if (strcmp(res, "ping")) {
+            char * value = from_json(outmsg, "Value");
+            base64_decode(value, strlen(value), base_decode);
+
+            int outpacketlen = 0;
+            make_packet(PACKET_CMD_PING_S, 0x00, dev_id, 0, strlen(base_decode), base_decode, &outpacket, &outpacketlen);
             
-            unsigned char * buf;
-            struct gateway_op *message = message_queue_message_alloc_blocking(&https_queue);
-            message->operation = OP_WRITE_HTTP;
+            base64_encode(outpacket, outpacketlen , base_encode);
 
-            buf = malloc(MAX_HTTPS_PACKET_BUFFER);
-            sprintf(buf, HTTP_MSG_CHANGESTATUS_ALLOFF, HTTPS_IP_ADDR, HTTPS_PORT_NUM);
-            message->message_txt = buf;
-            message_queue_write(&https_queue, message);  
+            sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", modem_addr, base_encode);
+        } else if (strcmp(res, "inspectionResult")) {
+            int outpacketlen = 0;
+            make_packet(PACKET_CMD_INSPECTION_RES_S, 0x00, dev_id, 0, 0, NULL, &outpacket, &outpacketlen);
+            
+            base64_encode(outpacket, outpacketlen , base_encode);
+
+            sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", modem_addr, base_encode);
+        } else if (strcmp(res, "encryptionKeyRequest")) {
+            char * value = from_json(outmsg, "Value");
+            base64_decode(value, strlen(value), base_decode);
+
+            int outpacketlen = 0;
+            make_packet(PACKET_CMD_ENCKEY_REQ_S, 0x00, dev_id, 0, strlen(base_decode), base_decode, &outpacket, &outpacketlen);
+            
+            base64_encode(outpacket, outpacketlen , base_encode);
+
+            sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", modem_addr, base_encode);
+
+            //encrypt key update
+            memcpy(Key, base_decode + 5, CRL_AES192_KEY); //24 byte key update
+        } else if (strcmp(res, "logCheckMessage")) {
+            char * value = from_json(outmsg, "Value");
+            base64_decode(value, strlen(value), base_decode);
+
+            int outpacketlen = 0;
+            make_packet(PACKET_CMD_ENCKEY_REQ_S, 0x00, dev_id, 0, strlen(base_decode), base_decode, &outpacket, &outpacketlen);
+            
+            base64_encode(outpacket, outpacketlen , base_encode);
+
+            sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", modem_addr, base_encode);
+
+            //encrypt key update
+            memcpy(Key, base_decode + 5, CRL_AES192_KEY); //24 byte key update
+        } else if (strcmp(res, "errorCheck")) {
+            int outpacketlen = 0;
+            make_packet(PACKET_CMD_INSPECTION_RES_S, 0x00, dev_id, 0, 0, NULL, &outpacket, &outpacketlen);
+            
+            base64_encode(outpacket, outpacketlen , base_encode);
+
+            sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", modem_addr, base_encode);
+        } else if (strcmp(res, "dashResult")) {
+            int outpacketlen = 0;
+            make_packet(PACKET_CMD_INSPECTION_RES_S, 0x00, dev_id, 0, 0, NULL, &outpacket, &outpacketlen);
+            
+            base64_encode(outpacket, outpacketlen , base_encode);
+
+            sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", modem_addr, base_encode);
+        } else {
+
         }
-        */
 
-        //jason parsing
-
+        // uart 전송 요청
+        struct gateway_op *message = message_queue_message_alloc_blocking(&uart_w_queue);
+        message->operation = OP_WRITE_UART;
+        message->message_txt = cmd_buffer[_AT_USER_CMD];
+        message->uartfd = fd;
+        message_queue_write(&uart_w_queue, message);
 
 
 
@@ -395,16 +451,16 @@ char * make_json(char * key, char * value)
 }
 
 //JSON  문자열에서 value 얻기
-json_t *load_json(const char *text) {
+json_t *load_json(const char *jason) {
     json_t *root;
     json_error_t error;
 
-    root = json_loads(text, 0, &error);
+    root = json_loads(jason, 0, &error);
 
     if (root) {
         return root;
     } else {
-        fprintf(stderr, "json error on line %d: %s\n", error.line, error.text);
+        LOG_DEBUG("json error on line %d: %s\n", error.line, error.text);
         return (json_t *)0;
     }
 }
@@ -529,7 +585,7 @@ url , 전달 데이터를 주면 서버에
 SSL request JSON을 포함해서 전송 한다.
 value 가 없을 경우 데이터 없이 전송 한다.
 */
-void SSLServerSend(char *url, char *value, int valuelen) {
+void SSLServerSend(char *url, char *value, int valuelen, int modem_addr) {
 
     unsigned char * buf;
     unsigned char base_encode[MAX_PACKET_BUFFER];
@@ -548,5 +604,6 @@ void SSLServerSend(char *url, char *value, int valuelen) {
     }
 
     message->message_txt = buf;
+    message->addr = modem_addr; //모뎀 어드레스
     message_queue_write(&https_queue, message);
 }

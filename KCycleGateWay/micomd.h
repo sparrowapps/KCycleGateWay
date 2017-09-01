@@ -18,7 +18,6 @@ typedef signed long int        INT32;
 #define UART                   1
 #define SOCKET                 2
 
-
 #define TOKEN_TGT             "TGT"
 #define TOKEN_GID             "GID"
 #define TOKEN_CH              "CH"
@@ -94,7 +93,6 @@ Content-Type: application/json\n\
 {\"data\":\"01020304050607080910111213141516171819202122232425\"}\
 "
 
-
 //HTTPS 헤더 뼈다귀 url, IP, PORT, json string
 #define HTTPS_HEADER "POST %s HTTP/1.1\n\
 Host: %s:%s\n\
@@ -111,19 +109,6 @@ Content-Type: application/json\n\
 \n\
 %s\
 "
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 typedef enum AT_CMD {
     _AT_START   = 0,
@@ -204,6 +189,14 @@ typedef enum REST_STATUS {
 #define PACKET_CMD_RACECYCLESULT_R  0x37
 #define PACKET_CMD_RACECYCLESULT_S  0x38
 
+#define RST 9
+#define PIO 7
+
+#define CRL_AES192_KEY      24
+#define CRL_AES_BLOCK       16
+#define MAX_DEVICES         256
+
+
 int create_socket (int portnum);
 int read_packet (int fd, int cnt, PBYTE buf, int fd_index);
 int check_socket (PBYTE data_buf, WORD size, int fd);
@@ -244,7 +237,8 @@ int hex2val(const char ch);
 int extract_packet (unsigned char * inputpacket, char * outcode, char * outsubcode, char * outsenderid, short * outpn, char * outlen, unsigned char ** outvalue);
 int packet_process(unsigned char * inputpacket, int addr);
 
-
+//micomd extern global variable
+extern int cnt_fd_socket;
 extern int list_end;
 extern int cmd_state;
 extern DATA_STATUS_TYPE data_status;
@@ -252,7 +246,7 @@ extern int fd_masks[MAX_SOCKET_FD];
 extern unsigned char cmd_buffer[MAX_CMD][MAX_PACKET_BUFFER];
 extern int cmd_id;
 extern int ipc_send_flag;
-
-
+extern BYTE dev_id[3];
+unsigned char Key[CRL_AES192_KEY];
 #endif /* _MICOM_H_ */
 

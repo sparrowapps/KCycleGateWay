@@ -2,4 +2,4 @@
 
 #define _PACKET_ENCRYPTY
 
-void SSLServerSend(char *url, char *value, int valuelen);
+void SSLServerSend(char *url, char *value, int valuelen, int modem_addr);
