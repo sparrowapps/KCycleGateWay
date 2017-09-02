@@ -128,6 +128,14 @@ sudo apt-get install libjansson-dev
 sudo ldconfig
 ~~~
 
+## 타임존 설정
+~~~
+.profiel에 TZ 설정
+
+TZ='Asia/Seoul'; export TZ
+~~~
+
+
 
 ## 디버거 nemiver GDB frontend
 ~~~

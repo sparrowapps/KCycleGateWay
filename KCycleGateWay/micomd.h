@@ -11,7 +11,7 @@ typedef signed long int        INT32;
 #define SOCK_IP_ADDR           "127.0.0.1"
 #define PORT_NUM               8443
 
-#define HTTPS_IP_ADDR          "160.100.1.147"
+#define HTTPS_IP_ADDR          "192.168.11.15" //"160.100.1.147"
 #define HTTPS_PORT_NUM         "443"
 
 /* fd index */
@@ -49,7 +49,7 @@ typedef signed long int        INT32;
 #define MAX_MASK_BYTE          11
 #define MAX_CMD                20
 
-#define MAX_HTTPS_PACKET_BUFFER 4096
+#define MAX_HTTPS_PACKET_BUFFER 8192
 
 #define HTTP_MSG_WHATISMYJOB    "GET /gateway/whatismyjob?jobno=%s HTTP/1.1\n\
 Host: %s:%s\n\
@@ -180,8 +180,8 @@ typedef enum REST_STATUS {
 #define PACKET_CMD_RACESTATECHK_R   0x30
 #define PACKET_CMD_RACESTATECHK_S   0x31
 
-#define PACKET_CMD_RACESTARTTIME_S  0x33
-#define PACKET_CMD_RACESTARTTIME_R  0x34
+#define PACKET_CMD_RACESTART_S      0x33
+#define PACKET_CMD_RACESTART_R      0x34
 
 #define PACKET_CMD_RACELINERESULT_R 0x35
 #define PACKET_CMD_RACELINERESULT_S 0x36
@@ -222,20 +222,23 @@ int add_socket(int fd);
 //packet
 void make_packet(char code, 
                  char subcode, 
-                 char * senderid, 
-                 short pn, 
+                 int addr,
                  char len, 
                  char * value, 
-                 unsigned char ** out_packet,
+                 unsigned char * out_packet,
                  int * outlen);
 
 int validate_ac(char * senderid, short pn, unsigned char * acbuf);
-void make_ac_code(char * senderid, short pn, unsigned char ** out_ac);
+void make_ac_code(char * senderid, short pn, unsigned char * out_ac);
 char * hexbuf2buf(const char * hexbuf);
 int hex2val(const char ch);
 
-int extract_packet (unsigned char * inputpacket, char * outcode, char * outsubcode, char * outsenderid, short * outpn, char * outlen, unsigned char ** outvalue);
+int extract_packet (unsigned char * inputpacket, char * outcode, char * outsubcode, char * outsenderid, short * outpn, char * outlen, unsigned char * outvalue);
 int packet_process(unsigned char * inputpacket, int addr);
+
+int getAddrFromDevices(char * dev_id);
+char * getDevIDFromDevices(int dev_addr);
+void make_date_data(char * outtime_val);
 
 //micomd extern global variable
 extern int cnt_fd_socket;

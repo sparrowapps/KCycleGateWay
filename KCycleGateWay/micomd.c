@@ -22,6 +22,7 @@
 #include <openssl/evp.h>
 #include <openssl/err.h>
 #include <openssl/ssl.h>
+#include <time.h>
 #include "micomd.h"
 #include "uart.h"
 #include "wiringPi.h"
@@ -76,6 +77,10 @@ typedef struct list_id {
 
 list devices[MAX_DEVICES];
 
+// 2개
+int packetnumberArray[MAX_DEVICES] = {0,};
+// Key reset 되면 0
+
 /* Key to be used for AES encryption/decryption */
 unsigned char Key[CRL_AES192_KEY] =
 {
@@ -96,12 +101,12 @@ BYTE cmd_buffer[MAX_CMD][MAX_PACKET_BUFFER] =
     "++++\r\n",                         //  0
     "AT+ACODE=00 00 00 00\r\n",         //  1
     "AT+MMODE=1\r\n",                   //  2
-    "AT+GRP_ID=01 35 46\r\n",           //  3
-    "AT+FBND=3\r\n",                    //  4
-    "AT+MADD=0\r\n",                    //  5
-    "AT+CHN=5\r\n",                     //  6
-    "AT+BCST=1\r\n",                    //  7
-    "AT+DRATE=2\r\n",                   //  8
+    "AT+GRP_ID=01 35 46\r\n",           //  3 // to-do 받아온 글부아이디를 설정 해야 한다.
+    "AT+FBND=3\r\n",                    //  4 // to-do 받아온 글부아이디를 설정 해야 한다.
+    "AT+MADD=0\r\n",                    //  5 // to-do 받아온 글부아이디를 설정 해야 한다.
+    "AT+CHN=5\r\n",                     //  6 // to-do 받아온 글부아이디를 설정 해야 한다.
+    "AT+BCST=1\r\n",                    //  7 // to-do 받아온 글부아이디를 설정 해야 한다.
+    "AT+DRATE=2\r\n",                   //  8 // to-do 받아온 글부아이디를 설정 해야 한다.
     "AT+RNDCH=0\r\n",                   //  9
     "AT+PAIR=1\r\n",                    // 10
     "AT+ID?\r\n",                       // 11
@@ -192,6 +197,7 @@ int ssl_write(unsigned char * msg, unsigned char ** outmsg, int * outmsglen) {
     }
 
     SSL_write(sslOpenToServer.ssl, msg, strlen(msg));
+    LOG_DEBUG("\n https request %d bytes\n", bytes);
     BIO_dump_fp(stdout, msg, strlen(msg));
 
     buf = malloc(MAX_HTTPS_PACKET_BUFFER);
@@ -205,12 +211,13 @@ int ssl_write(unsigned char * msg, unsigned char ** outmsg, int * outmsglen) {
 
     SSLCloseToServer(&sslOpenToServer);
 
-    if (bytes != 0) { 
+    if (bytes > 0) { 
         *outmsg = buf;
         *outmsglen = bytes;
     } else {
         *outmsg = NULL;
         *outmsglen = 0;
+        free(buf);
     }
 
     return 0;
@@ -399,7 +406,11 @@ int check_rf_data(PBYTE data_buf)
             }
             else
             {
-               cmd_state = _AT_USER_CMD;
+                // ++++ 전송
+                cmd_id = _AT_START;
+                ipc_send_flag = 1;
+                data_status = _DATA_AT_MODE;
+                LOG_DEBUG("AT command mode ....................\n");
             }
         }
     }
@@ -431,7 +442,7 @@ int check_rf_data(PBYTE data_buf)
                 else
                 {
                     LOG_DEBUG("token = %s\n", token);
-                    // 0100EF000001008505039C01106E950D2C3D178C051136BA50F51BE283
+                    
                     unsigned char base_decode[MAX_PACKET_BUFFER];
                     memset(base_decode, 0x00, sizeof(base_decode));
 
@@ -440,7 +451,7 @@ int check_rf_data(PBYTE data_buf)
 
                     LOG_DEBUG("base64 decode %02X , %02x\n", base_decode[0], base_decode[1]); 
 
-                    //rf_data_parser(base_decode, addr); //응답 addr을 보내야 한다.
+                    
                     packet_process(base_decode, addr);
                 }
             }
@@ -529,7 +540,6 @@ int check_uart (PBYTE data_buf)
             }
             else
             {
-                // 여기서 다음 스텝으로 진행 할것을 처리 해야 할듯 하다.
                 cmd_state = _AT_USER_CMD;
             }
         }
@@ -570,16 +580,14 @@ int check_uart (PBYTE data_buf)
         switch(cmd_state)
         {
             case _AT_ACODE:
-#if 1
+
                 if(pair_status == _PAIRED)
                 {
-                    cmd_id = _AT_LST_ID;
+                    cmd_id = _AT_ID;
                     ipc_send_flag = 1;
                     device_idx = 0;
-                    //rst_status = _RESET_STATUS;
                 }
                 else
-#endif
                 {
                     cmd_id = _AT_MODE;
                     ipc_send_flag = 1;
@@ -588,16 +596,6 @@ int check_uart (PBYTE data_buf)
 
             case _AT_MODE:
                 op_mode = 1;
-#if 0
-                if(pair_status == _PAIRED)
-                {
-                    cmd_id = 13;
-                    ipc_send_flag = 1;
-                    device_idx = 0;
-                    //rst_status = _RESET_STATUS;
-                }
-                else
-#endif
                 {
                     cmd_id = _AT_FBND;
                     ipc_send_flag = 1;
@@ -605,6 +603,7 @@ int check_uart (PBYTE data_buf)
                 break;
 
             case _AT_GRP_ID:
+                // to-do 그룹아이디 파싱
                 grp_id[0] = 0x01;
                 grp_id[1] = 0x35;
                 grp_id[2] = 0x46;
@@ -655,21 +654,6 @@ int check_uart (PBYTE data_buf)
                 pair_status = _PAIRED;
                 break;
 
-            case _AT_ID:
-                {
-                    int i = 0;
-
-                    for(i = 0; i < 3; i++)
-                    {
-                        hex_decode((char *)(data_buf + 3*i), 1, &dev_id[i]);
-
-                        LOG_DEBUG("device_id[%d] = %x  \n", i, dev_id[i]);
-                    }
-                    cmd_id = _AT_PAIR;
-                    ipc_send_flag = 1;
-                }
-                break;
-
             default:
                 ipc_send_flag = 0;
                 break;
@@ -685,7 +669,7 @@ int check_uart (PBYTE data_buf)
         
             LOG_DEBUG("device_id[%d] = %x    \n", i, dev_id[i]);
         }
-        cmd_id = _AT_PAIR;
+        cmd_id = _AT_LST_ID;
         ipc_send_flag = 1;
     }
     else if(cmd_state == _AT_LST_ID)
@@ -746,7 +730,9 @@ int packet_process(unsigned char * inputpacket, int addr)
 
     short pn;
     char len;
-    unsigned char valuebuf[MAX_PACKET_BYTE];
+    //unsigned char valuebuf[MAX_PACKET_BYTE];
+    unsigned char  valuebuf[MAX_PACKET_BYTE];
+    
     memset(valuebuf, 0x00, MAX_PACKET_BYTE);
     
     int outpacketlen = 0;
@@ -755,8 +741,16 @@ int packet_process(unsigned char * inputpacket, int addr)
     memset(base_encode, 0x00, sizeof(base_encode));
 
     // 내아이디 얻기를 해야 함
+    LOG_DEBUG("bextract_packet\n"); 
+    if ( extract_packet(inputpacket, &code, &subcode, dev_id, &pn, &len, valuebuf) == 0 ){
+        //패킷 넘버 확인
+        if (pn < packetnumberArray[addr]) {
+            LOG_DEBUG("Packet number Error!");
+            return -1;
+        } else {
+            packetnumberArray[addr] ++;
+        }
 
-    if ( extract_packet(inputpacket, &code, &subcode, dev_id, &pn, &len, &valuebuf) == 0 ){
         switch (code)
         {
             case PACKET_CMD_PING_R:
@@ -764,9 +758,16 @@ int packet_process(unsigned char * inputpacket, int addr)
                 LOG_DEBUG("cmd PACKET_CMD_PING_R");
 
                 //서버 전송 리퀘스트
+                //https://localhost/inspectStatus/getMatchList.ajx
                 SSLServerSend("/gateway/ping", valuebuf, len, addr);
                 break;
-            
+            case PACKET_CMD_INSPECTION_REQ_R: // 패턴2
+                LOG_DEBUG("PACKET_CMD_INSPECTION_REQ_R");
+
+                SSLServerSend("/gateway/inspectionRequest", valuebuf, len, addr);
+                break;
+
+
             case PACKET_CMD_INSPECTION_RES_R:
                 LOG_DEBUG("cmd PACKET_CMD_INSPECTION_RES_R");
             
@@ -791,6 +792,30 @@ int packet_process(unsigned char * inputpacket, int addr)
                 SSLServerSend("/gateway/errorCheck", valuebuf, len, addr);
                 break;
 
+            case PACKET_CMD_TRAININGSTART_R: //패턴2
+                LOG_DEBUG("cmd PACKET_CMD_TRAININGSTART_R");
+            
+                SSLServerSend("/gateway/tranningStart", valuebuf, len, addr);
+                break;
+
+            case PACKET_CMD_TRAININGSTOP_R: //패턴2
+            LOG_DEBUG("cmd PACKET_CMD_TRAININGSTOP_R");
+        
+            SSLServerSend("/gateway/tranningStop", valuebuf, len, addr);
+            break;
+
+            case PACKET_CMD_DASHSTART_R: //패턴2
+            LOG_DEBUG("cmd PACKET_CMD_DASHSTART_R");
+        
+            SSLServerSend("/gateway/dashStart", valuebuf, len, addr);
+            break;
+
+            case PACKET_CMD_DASHSTOP_R: //패턴2
+            LOG_DEBUG("cmd PACKET_CMD_DASHSTOP_R");
+        
+            SSLServerSend("/gateway/dashStop", valuebuf, len, addr);
+            break;
+
             case PACKET_CMD_DASHRESULT_R:
                 LOG_DEBUG("cmd PACKET_CMD_DASHRESULT_R");
             
@@ -803,6 +828,12 @@ int packet_process(unsigned char * inputpacket, int addr)
                 SSLServerSend("/gateway/raceStateCheck", valuebuf, len, addr);
                 break;
 
+            case PACKET_CMD_RACESTART_R: //패턴2
+            LOG_DEBUG("cmd PACKET_CMD_RACESTART_R");
+        
+            SSLServerSend("/gateway/raceStart", valuebuf, len, addr);
+            break;
+    
             case PACKET_CMD_RACELINERESULT_R:
                 LOG_DEBUG("cmd PACKET_CMD_RACELINERESULT_R");
             
@@ -812,8 +843,38 @@ int packet_process(unsigned char * inputpacket, int addr)
             case PACKET_CMD_RACECYCLESULT_R:
                 //todo buffering 로직 필요
                 LOG_DEBUG("cmd PACKET_CMD_RACECYCLESULT_R");
-            
-                SSLServerSend("/gateway/raceCycleResult", valuebuf, len, addr);
+
+                // 여기서 버퍼링을 하고 디바이스로 바로 응답을 보낸다.
+                unsigned char outpacket[MAX_PACKET_BUFFER];
+                memset(outpacket, 0x00, sizeof(base_encode));
+                int outpacketlen = 0;
+
+                // 받은 서버코드를 싫어서 응답 전송
+                cmd_id = _AT_USER_CMD;
+                make_packet(PACKET_CMD_RACECYCLESULT_S, subcode, addr, 0, NULL, outpacket, &outpacketlen);
+                base64_encode(outpacket, outpacketlen , base_encode);
+                sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", addr, base_encode);    
+                ipc_send_flag = 1;
+
+                // 버퍼링이 끝나면 서버로 전송을 하고 끝
+
+                static char race_res_buf[MAX_HTTPS_PACKET_BUFFER];
+                static int offset;
+                if (subcode == 0x00) {
+                    memset (race_res_buf, 0x00, MAX_HTTPS_PACKET_BUFFER);
+                    offset = 0;
+                    memcpy (race_res_buf, valuebuf, len);
+
+
+                } else if (subcode > 0x80) {
+                    //last packet
+                    memcpy(race_res_buf + offset, valuebuf, len);
+                    SSLServerSend("/gateway/raceCycleResult", valuebuf, len, addr);
+                    
+                } else {
+                    //버퍼링
+                    memcpy(race_res_buf + offset, valuebuf, len);
+                }
                 break;
                 
             default:
@@ -821,6 +882,7 @@ int packet_process(unsigned char * inputpacket, int addr)
                 break;
         }
     }
+    
     return 0;
 }
 
@@ -831,7 +893,7 @@ int extract_packet (unsigned char * inputpacket,
                     char * outsenderid, 
                     short * outpn, 
                     char * outlen, 
-                    unsigned char ** outvalue)
+                    unsigned char * outvalue)
 {
     unsigned char dec_out[1000];
 
@@ -844,18 +906,18 @@ int extract_packet (unsigned char * inputpacket,
 
     //pn = (short)(packetnumber[1] << 8) +  (short)(packetnumber[0]);
     *outpn = (short)inputpacket[5] + (short)(inputpacket[6] << 8);
-
+    LOG_DEBUG("validate_ac before\n");
     if (validate_ac(inputpacket + 2, *outpn, inputpacket + 2) == 0){
         *outlen = *(inputpacket + 12);
         
         //plaintext
 #ifdef _PACKET_ENCRYPTY
         int decslength = decrypt_block(dec_out, inputpacket + 13, *outlen, Key, IV);
-        memcpy(*outvalue, dec_out, decslength);
-        LOG_DEBUG("plaintext :%s\n", *outvalue);
+        memcpy(outvalue, dec_out, decslength);
+        LOG_DEBUG("plaintext :%s\n", outvalue);
 #else 
-        memcpy(*outvalue, inputpacket + 13, *outlen);
-        LOG_DEBUG("plaintext :%s\n", *outvalue);
+        memcpy(outvalue, inputpacket + 13, *outlen);
+        LOG_DEBUG("plaintext :%s\n", outvalue);
 #endif
 
         return 0;
@@ -866,26 +928,29 @@ int extract_packet (unsigned char * inputpacket,
 }
 
 void make_packet(char code, 
-                 char subcode, 
-                 char * senderid, 
-                 short pn, 
+                 char subcode,
+                 int addr,
                  char len, 
                  char * value, 
-                 unsigned char ** out_packet,
+                 unsigned char * out_packet,
                  int * outlen)
 {
     unsigned char packetbuf[MAX_PACKET_BUFFER];
     packetbuf[0] = code;
     packetbuf[1] = subcode;
     
-    unsigned char * ac;
+    unsigned char ac[10];
     unsigned char enc_out[1000];
 
+    int pn = packetnumberArray[addr];
+
     memset(enc_out, 0x00, sizeof(enc_out));
-    ac = malloc(10);
-    make_ac_code(senderid, pn, &ac);
+    
+    make_ac_code(dev_id, pn, ac);
     memcpy(packetbuf + 2, ac, 10);
-    free(ac);
+    
+
+    LOG_DEBUG("make_packet mode_addr : %d", addr);
 
     int encslength = 0;
     if (value != NULL ) {
@@ -898,9 +963,10 @@ void make_packet(char code,
 #else
         packetbuf[12] = (int)len;
         memcpy(packetbuf + 13, value, (int)len);
+        encslength = len;
 #endif        
     BIO_dump_fp(stdout, packetbuf, 13 + encslength);
-    memcpy(*out_packet, packetbuf, 13 + encslength);
+    memcpy(out_packet, packetbuf, 13 + encslength);
 
     *outlen = 13 + encslength;
 
@@ -914,24 +980,24 @@ void make_packet(char code,
 int validate_ac(char * senderid, short pn, unsigned char * acbuf)
 {
 #ifdef _PACKET_ENCRYPTY
-    unsigned char * ac;
-    ac = malloc(10);
-    make_ac_code(senderid, pn, &ac);
+#error "code not defien"
+    unsigned char ac[10];
+    
+    make_ac_code(senderid, pn, ac);
 
     if ( memcmp(ac, acbuf, 10) == 0 ) {
-        free (ac);
         return 0;
     } else {
-        free(ac);
         return -1;
     }
 #else 
+    LOG_DEBUG("validate ac end\n");
     return 0;
 #endif
 }
 
 // AC 코드 생성
-void make_ac_code(char * senderid, short pn, unsigned char ** out_ac)
+void make_ac_code(char * senderid, short pn, unsigned char * out_ac)
 {
     unsigned char ac[10];
     unsigned char senderidbuf[3];
@@ -961,7 +1027,22 @@ void make_ac_code(char * senderid, short pn, unsigned char ** out_ac)
     SHA256_Final(digest, &ctx);
 
     memcpy(ac + 5, digest + 27, 5);
-    memcpy(*out_ac, ac, sizeof(ac));
+    memcpy(out_ac, ac, sizeof(ac));
+}
+
+void make_date_data(char * outtime_val)
+{
+    time_t t = time(NULL);
+    struct tm tm = *localtime(&t);
+
+    char time_val[5];
+    time_val[0] = tm.tm_year + 1900 - 2000;
+    time_val[1] = tm.tm_mon;
+    time_val[2] = tm.tm_mday;
+    time_val[3] = tm.tm_hour;
+    time_val[4] = tm.tm_min;
+
+    memcpy(outtime_val, time_val, 5);
 }
 
 BYTE* hex_decode(char *in, int len, BYTE *out)
@@ -1000,14 +1081,12 @@ int parse_data (PBYTE data_buf, int *cnt)
             index++;
     }
 
-    LOG_DEBUG("parse_data ===> cmd_state[%d], index[%d]\n", cmd_state, index);
     if(cmd_state != -1 && cmd_state != _AT_START)
     {
         if(cmd_state == _AT_RST)
         {
             if(index >= 3)
             {
-                LOG_DEBUG("parse_data ===> cmd_state[%d], index[%d]\n", cmd_state, index);
                 return 1;
             }
             else
@@ -1017,7 +1096,6 @@ int parse_data (PBYTE data_buf, int *cnt)
         {
             if(index == 1)
             {
-                LOG_DEBUG("parse_data ===> cmd_state[%d], index[%d]\n", cmd_state, index);
                 return 1;
             }
             else
@@ -1028,10 +1106,9 @@ int parse_data (PBYTE data_buf, int *cnt)
     {
         if(cmd_state == -1)
         {
-            LOG_DEBUG("parse_data ===> cmd_state[%d], index[%d]\n", cmd_state, index);
+
             if(index >= 3)
             {
-                LOG_DEBUG("parse_data ===> cmd_state[%d], index[%d]\n", cmd_state, index);
                 return 1;
             }
             else
@@ -1041,13 +1118,36 @@ int parse_data (PBYTE data_buf, int *cnt)
         {
             if(memcmp(data_buf, AT_ST_HEADER, strlen(AT_ST_HEADER)) == 0)
             {
-                LOG_DEBUG("parse_data ===> cmd_state[%d], index[%d]\n", cmd_state, index);
                 return 1;
             }
             else
                 return 0;
         }
     }
+}
+
+
+// 모뎀 어드레스 얻기
+int getAddrFromDevices(char * dev_id)
+{
+    for (int i= 0 ; i < MAX_DEVICES ; i++)
+    {
+        if (!memcmp(devices[i].dev_id, dev_id, sizeof(devices[0].dev_id))) {
+            return devices[i].dev_addr;
+        }
+    }
+    return -1;
+}
+
+char * getDevIDFromDevices(int dev_addr)
+{
+    for (int i= 0 ; i < MAX_DEVICES ; i++)
+    {
+        if ( dev_addr == devices[i].dev_addr ) {
+            return devices[i].dev_id;
+        }
+    }
+    return NULL;
 }
 
 int get_max_fd (int a, int b, int c) {
