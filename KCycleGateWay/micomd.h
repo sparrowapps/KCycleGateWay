@@ -109,25 +109,50 @@ Content-Type: application/json\n\
 \n\
 %s\
 "
+/*
+    "++++\r\n",                         //  0
+    "AT+ACODE=00 00 00 00\r\n",         //  1
+    "AT+MMODE=1\r\n",                   //  2
+    "AT+GRP_ID=%02X %02X %02X\r\n",     //  3 
+    "AT+FBND=3\r\n",                    //  4 
+    "AT+MADD=0\r\n",                    //  5 
+    "AT+CHN=5\r\n",                     //  6 
+    "AT+BCST=1\r\n",                    //  7 
+    "AT+DRATE=2\r\n",                   //  8 
+    "AT+RNDCH=0\r\n",                   //  9
+    "AT+PAIR=1\r\n",                    // 10
+    "AT+ID?\r\n",                       // 11
+    "AT+RST=1\r\n",                     // 12
+    "AT+LST_ID?\r\n",                   // 13
+    "AT+REG_#ID=2, 01 23 45\r\n"        // 14
+    "",
+*/
 
-typedef enum AT_CMD {
-    _AT_START   = 0,
-    _AT_ACODE   = 1,
-    _AT_MODE    = 2,
-    _AT_GRP_ID  = 3,
-    _AT_FBND    = 4,
-    _AT_MADD    = 5,
-    _AT_CHN     = 6, 
-    _AT_BCST    = 7,
-    _AT_DRATE   = 8,
-    _AT_RNDCH   = 9,
-    _AT_PAIR    = 10,
-    _AT_ID      = 11,
-    _AT_RST     = 12,
-    _AT_LST_ID  = 13,
-    _AT_USER_CMD = 14,
-    _AT_CMD_NONE = 19,
-} AT_CMD_TYPE;
+#define AT_GRP_ID_FMT   "AT+GRP_ID=%02X %02X %02X\r\n"
+#define AT_FBAND_FMT    "AT+FBND=%d\r\n"
+#define AT_CHN_FMT      "AT+CHN=%d\r\n"
+#define AT_DRATE_FMT    "AT+DRATE=%d\r\n"
+#define AT_REG_ID_FMT   "AT+REG_#ID=%d, %02X %02X %02X\r\n"
+
+typedef enum AT_CMD {               
+    _AT_START    = 0,       
+    _AT_ACODE    = 1,       
+    _AT_MODE     = 2,       
+    _AT_GRP_ID   = 3,       
+    _AT_FBND     = 4,       
+    _AT_MADD     = 5,       
+    _AT_CHN      = 6, 
+    _AT_BCST     = 7,
+    _AT_DRATE    = 8,
+    _AT_RNDCH    = 9,
+    _AT_PAIR     = 10,       
+    _AT_ID       = 11,
+    _AT_RST      = 12,
+    _AT_LST_ID   = 13,
+    _AT_REG_ID   = 14,
+    _AT_USER_CMD = 15, 
+    _AT_CMD_NONE = 19, 
+} AT_CMD_TYPE;          
 
 typedef enum DATA_STATUS {
     _DATA_RF_MODE = 0,
@@ -143,6 +168,18 @@ typedef enum REST_STATUS {
     _RESET_NONE = 0,
     _RESET_STATUS = 1,
 } RESET_STATUS_TYPE;
+
+typedef enum MANUAL_PARING_STATUS {
+    _MANUAL_PARING_NONE = 0,
+    _MANUAL_PARING_STATUS = 1,
+} MANUAL_PARING_STATUS_TYPE;
+
+// 계측기 리스트 
+typedef struct list_id {
+    BYTE dev_addr;
+    BYTE dev_id[3];
+} list;
+
 
 #define PACKET_CMD_PING_R           0x01
 #define PACKET_CMD_PING_S           0x02
@@ -188,6 +225,10 @@ typedef enum REST_STATUS {
 
 #define PACKET_CMD_RACECYCLESULT_R  0x37
 #define PACKET_CMD_RACECYCLESULT_S  0x38
+
+// 임시커맨드
+#define PACKET_CMD_RACESTOP_S      0x39
+#define PACKET_CMD_RACESTOP_R      0x3A
 
 #define RST 9
 #define PIO 7
@@ -250,6 +291,9 @@ extern unsigned char cmd_buffer[MAX_CMD][MAX_PACKET_BUFFER];
 extern int cmd_id;
 extern int ipc_send_flag;
 extern BYTE dev_id[3];
-unsigned char Key[CRL_AES192_KEY];
+extern unsigned char Key[CRL_AES192_KEY];
+extern list devices[MAX_DEVICES]; // 페어링 정보를 여기에 넣는다.
+extern int devices_count;
+extern MANUAL_PARING_STATUS_TYPE manaual_parinig_status;
 #endif /* _MICOM_H_ */
 

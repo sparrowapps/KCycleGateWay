@@ -30,7 +30,6 @@
 #include "logger.h"
 #include "base64.h"
 
-
 // common variables for threads
 int uart_fd;
 int fd_masks[MAX_SOCKET_FD];
@@ -56,7 +55,7 @@ int cmd_state = -1; // 이전 커맨드 id
 int list_end = 0;   // 확인 필요 
 int op_mode = 0;
 int packet_size = 0;
-BYTE grp_id[3] = {0, 0, 0};
+
 BYTE dev_id[3] = {0, 0, 0};
 int rf_band = -1;
 int mod_address = -1;
@@ -69,13 +68,10 @@ DATA_STATUS_TYPE data_status = _DATA_RF_MODE; // AT 커맨드로 데이터를 �
 RESET_STATUS_TYPE rst_status = _RESET_NONE;  // AT reset 처리 했을때 1
 int device_idx = 0; 
 
-// 계측기 리스트 
-typedef struct list_id {
-    BYTE dev_addr;
-    BYTE dev_id[3];
-} list;
+MANUAL_PARING_STATUS_TYPE manaual_parinig_status = _MANUAL_PARING_NONE;
 
 list devices[MAX_DEVICES];
+int devices_count = 0; //디바이스 수
 
 // 2개
 int packetnumberArray[MAX_DEVICES] = {0,};
@@ -101,17 +97,18 @@ BYTE cmd_buffer[MAX_CMD][MAX_PACKET_BUFFER] =
     "++++\r\n",                         //  0
     "AT+ACODE=00 00 00 00\r\n",         //  1
     "AT+MMODE=1\r\n",                   //  2
-    "AT+GRP_ID=01 35 46\r\n",           //  3 // to-do 받아온 글부아이디를 설정 해야 한다.
-    "AT+FBND=3\r\n",                    //  4 // to-do 받아온 글부아이디를 설정 해야 한다.
-    "AT+MADD=0\r\n",                    //  5 // to-do 받아온 글부아이디를 설정 해야 한다.
-    "AT+CHN=5\r\n",                     //  6 // to-do 받아온 글부아이디를 설정 해야 한다.
-    "AT+BCST=1\r\n",                    //  7 // to-do 받아온 글부아이디를 설정 해야 한다.
-    "AT+DRATE=2\r\n",                   //  8 // to-do 받아온 글부아이디를 설정 해야 한다.
+    "AT+GRP_ID=01 35 46\r\n",           //  3 
+    "AT+FBND=3\r\n",                    //  4 
+    "AT+MADD=0\r\n",                    //  5 
+    "AT+CHN=5\r\n",                     //  6 
+    "AT+BCST=1\r\n",                    //  7 
+    "AT+DRATE=2\r\n",                   //  8 
     "AT+RNDCH=0\r\n",                   //  9
     "AT+PAIR=1\r\n",                    // 10
     "AT+ID?\r\n",                       // 11
     "AT+RST=1\r\n",                     // 12
     "AT+LST_ID?\r\n",                   // 13
+    "AT+REG_#ID=2, 01 23 45\r\n",       // 14
     "",
 };
 
@@ -183,6 +180,7 @@ static void hex_print(const void* pv, size_t len)
     printf("\n");
 }
 
+extern char * ssl_server_ip;
 // ssl http write 
 int ssl_write(unsigned char * msg, unsigned char ** outmsg, int * outmsglen) {
     unsigned char * buf;
@@ -190,10 +188,20 @@ int ssl_write(unsigned char * msg, unsigned char ** outmsg, int * outmsglen) {
 
     SSL_OPEN_TO_SERVER sslOpenToServer;
 
-    if (SSLOpenToServer(&sslOpenToServer, HTTPS_IP_ADDR, HTTPS_PORT_NUM) != SSL_OPEN_TO_SERVER_SUCCESS)
-    {
-        puts("SSLOpenToServer fail\n");
-        return -1;
+    if (ssl_server_ip != NULL ) {
+        if (SSLOpenToServer(&sslOpenToServer, ssl_server_ip, HTTPS_PORT_NUM) != SSL_OPEN_TO_SERVER_SUCCESS)
+        {
+            puts("SSLOpenToServer fail\n");
+            return -1;
+        }
+    
+    } else {
+        if (SSLOpenToServer(&sslOpenToServer, HTTPS_IP_ADDR, HTTPS_PORT_NUM) != SSL_OPEN_TO_SERVER_SUCCESS)
+        {
+            puts("SSLOpenToServer fail\n");
+            return -1;
+        }
+        
     }
 
     SSL_write(sslOpenToServer.ssl, msg, strlen(msg));
@@ -449,8 +457,7 @@ int check_rf_data(PBYTE data_buf)
                     LOG_DEBUG("RF data : %s\n",token);
                     base64_decode(token, strlen(token) , base_decode);
 
-                    LOG_DEBUG("base64 decode %02X , %02x\n", base_decode[0], base_decode[1]); 
-
+                    LOG_DEBUG("base64 code: 0x%02X ,subcode: 0x%02x\n", base_decode[0], base_decode[1]); 
                     
                     packet_process(base_decode, addr);
                 }
@@ -581,6 +588,13 @@ int check_uart (PBYTE data_buf)
         {
             case _AT_ACODE:
 
+                if (manaual_parinig_status == _MANUAL_PARING_STATUS )
+                {
+                    cmd_id = _AT_GRP_ID;
+                    ipc_send_flag = 1;
+                    break;
+                }
+
                 if(pair_status == _PAIRED)
                 {
                     cmd_id = _AT_ID;
@@ -603,29 +617,31 @@ int check_uart (PBYTE data_buf)
                 break;
 
             case _AT_GRP_ID:
-                // to-do 그룹아이디 파싱
-                grp_id[0] = 0x01;
-                grp_id[1] = 0x35;
-                grp_id[2] = 0x46;
                 cmd_id = _AT_FBND;
                 ipc_send_flag = 1;
                 break;
 
             case _AT_FBND:
-                rf_band = 3;
-                cmd_id = _AT_MADD;
+                if (manaual_parinig_status == _MANUAL_PARING_STATUS) {
+                    cmd_id = _AT_CHN;
+                } else {               
+                    cmd_id = _AT_MADD;
+                }
                 ipc_send_flag = 1;
                 break;
 
             case _AT_MADD:
-                mod_address = 0;
                 cmd_id = _AT_CHN;
                 ipc_send_flag = 1;
                 break;
 
             case _AT_CHN:
-                rf_channel = 5;
-                cmd_id = _AT_BCST;
+                if (manaual_parinig_status == _MANUAL_PARING_STATUS) {
+                    cmd_id = _AT_DRATE;
+                    device_idx = 0;
+                } else {
+                    cmd_id = _AT_BCST;
+                }
                 ipc_send_flag = 1;
                 break;
 
@@ -636,8 +652,23 @@ int check_uart (PBYTE data_buf)
                 break;
 
             case _AT_DRATE:
-                data_rate = 2;
-                cmd_id = _AT_RNDCH;
+
+                if (manaual_parinig_status == _MANUAL_PARING_STATUS) {
+                    cmd_id = _AT_REG_ID;
+                    // 디바이스 리스트 를 엎어야 한다.
+                    sprintf(cmd_buffer[_AT_REG_ID], AT_GRP_ID_FMT, devices[device_idx].dev_addr, 
+                        devices[device_idx].dev_id[0], 
+                        devices[device_idx].dev_id[1], 
+                        devices[device_idx].dev_id[2]);
+                        device_idx ++;
+                        if (device_idx == devices_count) {
+                            cmd_id = _AT_RST;
+                            rst_status = _RESET_STATUS;
+                            data_status = _DATA_RF_MODE;
+                        }
+                } else {
+                    cmd_id = _AT_RNDCH;
+                }
                 ipc_send_flag = 1;
                 break;
 
@@ -709,6 +740,8 @@ int check_uart (PBYTE data_buf)
                 LOG_DEBUG("device[%d] addr = %d, id = [%x %x %x]\n", it, devices[it].dev_addr, devices[it].dev_id[0], devices[it].dev_id[1], devices[it].dev_id[2]);
             }
 
+            devices_count = device_idx; //장비 개수 
+
             cmd_id = _AT_RST;
             rst_status = _RESET_STATUS;
             list_end = 0;
@@ -744,59 +777,59 @@ int packet_process(unsigned char * inputpacket, int addr)
     LOG_DEBUG("bextract_packet\n"); 
     if ( extract_packet(inputpacket, &code, &subcode, dev_id, &pn, &len, valuebuf) == 0 ){
         //패킷 넘버 확인
+#if 0        
         if (pn < packetnumberArray[addr]) {
             LOG_DEBUG("Packet number Error!");
             return -1;
         } else {
             packetnumberArray[addr] ++;
         }
-
+#endif
         switch (code)
         {
             case PACKET_CMD_PING_R:
             //todo 내 senderid 를 만들어야 한다.
-                LOG_DEBUG("cmd PACKET_CMD_PING_R");
+            LOG_DEBUG("cmd PACKET_CMD_PING_R");
 
-                //서버 전송 리퀘스트
-                //https://localhost/inspectStatus/getMatchList.ajx
-                SSLServerSend("/gateway/ping", valuebuf, len, addr);
-                break;
+            //서버 전송 리퀘스트
+            SSLServerSend("/gateway/ping", valuebuf, len, addr);
+            break;
+
             case PACKET_CMD_INSPECTION_REQ_R: // 패턴2
-                LOG_DEBUG("PACKET_CMD_INSPECTION_REQ_R");
+            LOG_DEBUG("PACKET_CMD_INSPECTION_REQ_R");
 
-                SSLServerSend("/gateway/inspectionRequest", valuebuf, len, addr);
-                break;
-
+            SSLServerSend("/gateway/inspectionRequest", valuebuf, len, addr);
+            break;
 
             case PACKET_CMD_INSPECTION_RES_R:
-                LOG_DEBUG("cmd PACKET_CMD_INSPECTION_RES_R");
-            
-                SSLServerSend("/gateway/inspectionResult", valuebuf, len, addr);
-                break;
+            LOG_DEBUG("cmd PACKET_CMD_INSPECTION_RES_R : %x", valuebuf[0]);
+        
+            SSLServerSend("/gateway/inspectionResult", valuebuf, len, addr);
+            break;
 
             case PACKET_CMD_ENCKEY_REQ_R:
-                LOG_DEBUG("cmd PACKET_CMD_ENCKEY_REQ_R");
-            
-                SSLServerSend("/gateway/encryptionKeyRequest", valuebuf, len, addr);
-                break;
+            LOG_DEBUG("cmd PACKET_CMD_ENCKEY_REQ_R");
+        
+            SSLServerSend("/gateway/encryptionKeyRequest", valuebuf, len, addr);
+            break;
 
             case PACKET_CMD_LOGCHK_R:
-                LOG_DEBUG("cmd PACKET_CMD_LOGCHK_R");
-            
-                SSLServerSend("/gateway/logCheckMessage", valuebuf, len, addr);
-                break;
+            LOG_DEBUG("cmd PACKET_CMD_LOGCHK_R");
+        
+            SSLServerSend("/gateway/logCheckMessage", valuebuf, len, addr);
+            break;
 
             case PACKET_CMD_ERRORCHK_R:
-                LOG_DEBUG("cmd PACKET_CMD_ERRORCHK_R");
-            
-                SSLServerSend("/gateway/errorCheck", valuebuf, len, addr);
-                break;
+            LOG_DEBUG("cmd PACKET_CMD_ERRORCHK_R");
+        
+            SSLServerSend("/gateway/errorCheck", valuebuf, len, addr);
+            break;
 
             case PACKET_CMD_TRAININGSTART_R: //패턴2
-                LOG_DEBUG("cmd PACKET_CMD_TRAININGSTART_R");
-            
-                SSLServerSend("/gateway/tranningStart", valuebuf, len, addr);
-                break;
+            LOG_DEBUG("cmd PACKET_CMD_TRAININGSTART_R");
+        
+            SSLServerSend("/gateway/tranningStart", valuebuf, len, addr);
+            break;
 
             case PACKET_CMD_TRAININGSTOP_R: //패턴2
             LOG_DEBUG("cmd PACKET_CMD_TRAININGSTOP_R");
@@ -817,69 +850,78 @@ int packet_process(unsigned char * inputpacket, int addr)
             break;
 
             case PACKET_CMD_DASHRESULT_R:
-                LOG_DEBUG("cmd PACKET_CMD_DASHRESULT_R");
-            
-                SSLServerSend("/gateway/dashResult", valuebuf, len, addr);
-                break;
+            LOG_DEBUG("cmd PACKET_CMD_DASHRESULT_R");
+        
+            SSLServerSend("/gateway/dashResult", valuebuf, len, addr);
+            break;
 
             case PACKET_CMD_RACESTATECHK_R:
-                LOG_DEBUG("cmd PACKET_CMD_RACESTATECHK_R");
-            
-                SSLServerSend("/gateway/raceStateCheck", valuebuf, len, addr);
-                break;
+            LOG_DEBUG("cmd PACKET_CMD_RACESTATECHK_R");
+        
+            SSLServerSend("/gateway/raceStateCheck", valuebuf, len, addr);
+            break;
 
             case PACKET_CMD_RACESTART_R: //패턴2
             LOG_DEBUG("cmd PACKET_CMD_RACESTART_R");
         
             SSLServerSend("/gateway/raceStart", valuebuf, len, addr);
             break;
-    
+
+            case PACKET_CMD_RACESTOP_R: //패턴2
+            LOG_DEBUG("cmd PACKET_CMD_RACESTOP_R");
+        
+            SSLServerSend("/gateway/raceStop", valuebuf, len, addr);
+            break;
+
             case PACKET_CMD_RACELINERESULT_R:
-                LOG_DEBUG("cmd PACKET_CMD_RACELINERESULT_R");
-            
-                SSLServerSend("/gateway/raceLineResult", valuebuf, len, addr);
-                break;
+            LOG_DEBUG("cmd PACKET_CMD_RACELINERESULT_R");
+        
+            SSLServerSend("/gateway/raceLineResult", valuebuf, len, addr);
+            break;
 
             case PACKET_CMD_RACECYCLESULT_R:
-                //todo buffering 로직 필요
-                LOG_DEBUG("cmd PACKET_CMD_RACECYCLESULT_R");
+            //todo buffering 로직 필요
+            LOG_DEBUG("cmd PACKET_CMD_RACECYCLESULT_R");
 
-                // 여기서 버퍼링을 하고 디바이스로 바로 응답을 보낸다.
-                unsigned char outpacket[MAX_PACKET_BUFFER];
-                memset(outpacket, 0x00, sizeof(base_encode));
-                int outpacketlen = 0;
+            // 여기서 버퍼링을 하고 디바이스로 바로 응답을 보낸다.
+            unsigned char outpacket[MAX_PACKET_BUFFER];
+            memset(outpacket, 0x00, sizeof(outpacket));
+            int outpacketlen = 0;
 
-                // 받은 서버코드를 싫어서 응답 전송
-                cmd_id = _AT_USER_CMD;
-                make_packet(PACKET_CMD_RACECYCLESULT_S, subcode, addr, 0, NULL, outpacket, &outpacketlen);
-                base64_encode(outpacket, outpacketlen , base_encode);
-                sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", addr, base_encode);    
-                ipc_send_flag = 1;
+            // 받은 subcode를 싫어서 uart 응답 전송
+            cmd_id = _AT_USER_CMD;
+            make_packet(PACKET_CMD_RACECYCLESULT_S, subcode, addr, 0, NULL, outpacket, &outpacketlen);
+            base64_encode(outpacket, outpacketlen , base_encode);
+            sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", addr, base_encode);    
+            ipc_send_flag = 1;
 
-                // 버퍼링이 끝나면 서버로 전송을 하고 끝
-
-                static char race_res_buf[MAX_HTTPS_PACKET_BUFFER];
-                static int offset;
-                if (subcode == 0x00) {
-                    memset (race_res_buf, 0x00, MAX_HTTPS_PACKET_BUFFER);
-                    offset = 0;
-                    memcpy (race_res_buf, valuebuf, len);
-
-
-                } else if (subcode > 0x80) {
-                    //last packet
-                    memcpy(race_res_buf + offset, valuebuf, len);
-                    SSLServerSend("/gateway/raceCycleResult", valuebuf, len, addr);
-                    
-                } else {
-                    //버퍼링
-                    memcpy(race_res_buf + offset, valuebuf, len);
-                }
-                break;
+            // 버퍼링이 끝나면 서버로 전송을 하고 끝
+            static char race_res_buf[MAX_HTTPS_PACKET_BUFFER];
+            static int offset;
+            if (subcode == 0x00) {
+                LOG_DEBUG("START buffering\n");
+                memset (race_res_buf, 0x00, MAX_HTTPS_PACKET_BUFFER);
+                
+                memcpy (race_res_buf, valuebuf, len);
+                offset += len;
+            } else if (subcode > 0x80) {
+                //last packet
+                memcpy(race_res_buf + offset, valuebuf, len);
+                offset += len;
+                LOG_DEBUG("END buffering %02x offset : %d\n" , subcode, offset);
+                LOG_DEBUG("SSLServer /gateway/raceCycleResult\n" , subcode, offset);
+                SSLServerSend("/gateway/raceCycleResult", race_res_buf, offset, addr);
+            } else {
+                //버퍼링
+                LOG_DEBUG("Buffering %02x offset : %d\n" , subcode, offset);
+                memcpy(race_res_buf + offset, valuebuf, len);
+                offset += len;
+            }
+            break;
                 
             default:
-                //nothing todo
-                break;
+            //nothing todo
+            break;
         }
     }
     
@@ -965,15 +1007,11 @@ void make_packet(char code,
         memcpy(packetbuf + 13, value, (int)len);
         encslength = len;
 #endif        
+    }
     BIO_dump_fp(stdout, packetbuf, 13 + encslength);
     memcpy(out_packet, packetbuf, 13 + encslength);
 
     *outlen = 13 + encslength;
-
-    } else {
-        packetbuf[12] = 0;
-        *outlen = 13;
-    }
 }
 
 // AC 코드 확인
@@ -1294,35 +1332,3 @@ char * hexbuf2buf(const char * hexbuf)
 
     return resbuf;
 }
-
-/*
-← "++++<CR><LF>”
-→ “AT.START<CR><LF>”
-← "AT+ACODE=00 00 00 00<CR><LF>”
-→ “OK<CR><LF>”
-   --> rf모듈과 AT 커맨드를 쓰겠다.
-
-← AT+LST_ID?<CR><LF>
-→ “50 00 1F<CR><LF>”
-   --> 내 아이디를 얻는다.
-
-계측기 ID 리스트 구축
-← AT+LST_ID?<CR><LF> 
-→ “0,30 00 1F<CR><LF>” 
-→ “<CR><LF>”
-   --> 페어링된 아이디 리스트를 얻는다.
-
-← "AT+RST=1<CR><LF>”
-→ “OK<CR><LF>”
-→ ”RDY SW:BA05.0<CR><LF>”
-→ ”BAND:3,CHN:0,DRATE:2,MODE:0<CR><LF>” → ”UNPAIRED<CR><LF>”
-→ ”<CR><LF>”
-   -->무선통신 모드로 전환
-
-
-   페어링 리스트를 확인 없으면 
-   페어링 정보를 얻어다가
-   페어링 정보를 저장 한다.
-   페어링 정보를 서버가 주면 페어링 정보를 AT커맨드로 갱신한다.
-
-*/

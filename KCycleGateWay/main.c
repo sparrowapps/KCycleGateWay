@@ -7,9 +7,6 @@ Date        : 2017.07.03
 Copyright   : 
 Description : 
 
-char ** 함수내에서 얼록을 하는 경우 사용
-
-
 ============================================================================
 */
 
@@ -68,6 +65,9 @@ static int SSLCMD = 0;
 
 static int uart_fd = 0;
 
+char * ssl_server_ip = NULL;
+extern char * ssl_server_ip;
+
 static void *uart_write_threadproc(void *dummy) {
     LOG_DEBUG("uart_write_threadproc start\n");
     while (1) {
@@ -102,7 +102,6 @@ static void *http_write_threadproc(void *dummy) {
     }
     return NULL;
 }
-
 
 static void *socket_read_threadproc(void *dummy) {
     LOG_DEBUG("socket_read_threadproc start\n");
@@ -315,6 +314,9 @@ static void http_write( char *msg, int fd, int modem_addr) {
 
     int outpacketlen = 0;
 
+    int is_uart_send = 1;// 1전송, 0 미전송
+
+    cmd_id = _AT_USER_CMD;
     //ssl 응답을 처리 하는 함수 
     if (outmsg != NULL) {
 
@@ -326,12 +328,8 @@ static void http_write( char *msg, int fd, int modem_addr) {
         LOG_DEBUG("jason before\n");
         char * res = from_json(jason_str, "Result");
         LOG_DEBUG("jason afte %s\n", res);
-/*
-“Result”:” whatIsMyJob”
-“Message”:”Job”
-“JobName”:”Inspect IR” // “Inspect Wheel” 
-“DeviceID”:base64(”XXXXXX”) // rf serial no
-*/
+
+        // whatIsMyJob 처리
         if (!strcmp(res, "whatIsMyJob")) { // 패턴2
             LOG_DEBUG("recevie : whatIsMyJob\n");
             ///gateway/whatIsMyJob 응답 처리 JobName으로 다시 분기 하여 처리 한다.            
@@ -350,8 +348,8 @@ static void http_write( char *msg, int fd, int modem_addr) {
                 unsigned char irvalue = 0x02;
                 make_packet(PACKET_CMD_INSPECTION_REQ_S, 0x00, addr, 1, &irvalue, outpacket, &outpacketlen);
                 base64_encode(outpacket, outpacketlen , base_encode);
-                sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", addr, base_encode);
-                LOG_DEBUG("cmd_buffer[_AT_USER_CMD] %s\n",cmd_buffer[_AT_USER_CMD]);
+                sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", addr, base_encode);
+                LOG_DEBUG("cmd_buffer[cmd_id] %s\n",cmd_buffer[cmd_id]);
 
             } else if (!strcmp(jobname, "Inspect Wheel")) {
                 LOG_DEBUG("recJobNameevie : %s\n", jobname);
@@ -363,54 +361,104 @@ static void http_write( char *msg, int fd, int modem_addr) {
                 unsigned char irvalue = 0x01;
                 make_packet(PACKET_CMD_INSPECTION_REQ_S, 0x00, addr, 1, &irvalue, outpacket, &outpacketlen);
                 base64_encode(outpacket, outpacketlen , base_encode);
-                sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", addr, base_encode);    
+                sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", addr, base_encode);    
             } else if (!strcmp(jobname, "paringInfo"))  {
 
 
-                /*
-“ParingInfo”:[ //페어링정보 리스트 형태 
-“GRP_ID”:base64(3)
-“DEV_ID”:base64(3) 
-“DEV_ADDR”: base64(1) 
-“CHN”: base64(1) 
-“BADN”: base64(1) 
-“DRATE”: base64(1)
-]               
-                */
-#if 0
-                json_t *root;
-                json_error_t error;
-                root = json_object_get(jason_str, "“ParingInfo”");
-                if(!root)
-                {
-                    LOG_ERROR("error: on line %d: %s\n", error.line, error.text);
-                }
+/*
+GRP_ID : base64(3)
+CHN : 숫자값
+BAND : 숫자값
+DRATE : 숫자값
+COUNT : 숫자값
+ParingInfo : [
+    DEV_ID : base64(3) 
+    DEV_ADDR : 숫자값
+]
+*/
+#if 1
+            json_t *root;
+            json_error_t error;
+            char * grp_id;
+            char * chn;
+            char * band;
+            char * drate;
+            int count;
+            char decode_grp_id[10] = {0,};
             
-                if(!json_is_array(root))
+            json_t *paringinfo;
+            root = json_loads(jason_str, 0, &error);
+            
+            json_unpack(root, "{s:s, s:i, s:i, s:i, s:i, s:[s:s, s:i] }", 
+                "GRP_ID", &grp_id, 
+                "CHN", &chn, 
+                "BAND", &band, 
+                "DRATE", &drate, 
+                "COUNT", &count, 
+                "ParingInfo", &paringinfo
+            );
+            base64_encode(grp_id, strlen(grp_id) , decode_grp_id);
+
+            //AT command parameter update
+            sprintf(cmd_buffer[_AT_GRP_ID], AT_GRP_ID_FMT, decode_grp_id[0], decode_grp_id[1], decode_grp_id[2]);
+            sprintf(cmd_buffer[_AT_CHN], AT_CHN_FMT, chn);
+            sprintf(cmd_buffer[_AT_FBND], AT_FBAND_FMT, band);
+            sprintf(cmd_buffer[_AT_DRATE], AT_DRATE_FMT, drate);
+
+            // command 
+            LOG_DEBUG("[_AT_GRP_ID] : %s\n", cmd_buffer[_AT_GRP_ID]);
+            LOG_DEBUG("[_AT_CHN] : %s\n", cmd_buffer[_AT_CHN]);
+            LOG_DEBUG("[_AT_FBND] : %s\n", cmd_buffer[_AT_GRP_ID]);
+            LOG_DEBUG("[_AT_DRATE] : %s\n", cmd_buffer[_AT_DRATE]);
+            
+            cmd_id = _AT_START; // +++ 전송
+            manaual_parinig_status = _MANUAL_PARING_STATUS; // 메뉴얼 페어링 스테이터스
+            data_status = _DATA_AT_MODE;
+
+            LOG_DEBUG("total paring devices count : %d\n", count);
+            devices_count = count;
+
+            for (int i = 0; i < json_array_size(paringinfo); i++)
+            {
+                json_t *data, *dev_id, *dev_addr;
+                const char * dev_id_str;
+                int dev_addr_val;
+                char decode_dev_id[10] = {0,};
+                data = json_array_get(paringinfo, i);
+                if(!json_is_object(data))
                 {
-                    LOG_ERROR("error: root is not an array\n");
+                    LOG_DEBUG("error: commit data %d is not an object\n", (int)(i + 1));
                     json_decref(root);
                 }
 
-                for(int i = 0; i < json_array_size(root); i++)
+                dev_id = json_object_get(data, "DEV_ID");
+                if(!json_is_string(dev_id))
                 {
-                    json_t * data, *grp_id, *dev_id, *dev_addr, *chn, *badn, *drate;
-            
-                    data = json_array_get(root, i);
-                    if(!json_is_object(data))
-                    {
-                        LOG_ERROR("error: grp_id data %d is not an object\n", (int)(i + 1));
-                        json_decref(root);
-                    }
-            
-                    grp_id = json_object_get(data, "GRP_ID");
-                    if(!json_is_string(grp_id))
-                    {
-                        LOG_ERROR("error: grp_id data %d is not an object\n", (int)(i + 1));
-                    }
-
-                    char * grp_id_str = json_string_value(grp_id);
+                    LOG_DEBUG("error: DEV_ID %d: DEV_ID is not a string\n", (int)(i + 1));
                 }
+                dev_id_str = json_string_value(dev_id);
+                memset(decode_dev_id, 0x00, sizeof(decode_dev_id));
+                base64_encode(dev_id_str, strlen(dev_id_str) , decode_dev_id);
+
+                dev_addr = json_object_get(data, "DEV_ADDR");
+                if(!json_is_string(dev_addr))
+                {
+                    LOG_DEBUG("error: DEV_ADDR %d: DEV_ADDR is not a integer\n", (int)(i + 1));
+                }
+                dev_addr_val = json_integer_value(dev_addr);
+                
+                devices[i].dev_id[0] = decode_dev_id[0];
+                devices[i].dev_id[1] = decode_dev_id[1];
+                devices[i].dev_id[2] = decode_dev_id[2];
+                devices[i].dev_addr  = dev_addr_val;
+
+                LOG_DEBUG("devices[%d] dev_id[%02x, %02x, %02x, dev_addr: %d"
+                ,i,
+                devices[i].dev_id[0],
+                devices[i].dev_id[1],
+                devices[i].dev_id[2],
+                devices[i].dev_addr );
+            }
 #endif
                 //페어링 정보 어레이를 jansson  해석을 한다음 AT+CMD로 페어링 정보를 쏴야 한다.
             } else if (!strcmp(jobname, "trainingStart")) {
@@ -424,7 +472,7 @@ static void http_write( char *msg, int fd, int modem_addr) {
                 
                 make_packet(PACKET_CMD_TRAININGSTART_S, 0x00, addr, 5, date_val, outpacket, &outpacketlen);
                 base64_encode(outpacket, outpacketlen , base_encode);
-                sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", modem_addr, base_encode);
+                sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", modem_addr, base_encode);
 
             } else if (!strcmp(jobname, "trainingStop")) {
                 char * value = from_json(jason_str, "DeviceID");
@@ -434,7 +482,7 @@ static void http_write( char *msg, int fd, int modem_addr) {
                 
                 make_packet(PACKET_CMD_TRAININGSTOP_S, 0x00, addr, 0, NULL, outpacket, &outpacketlen);
                 base64_encode(outpacket, outpacketlen , base_encode);
-                sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", modem_addr, base_encode);
+                sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", modem_addr, base_encode);
                 
             } else if (!strcmp(jobname, "dashStart")) {
                 char * value = from_json(jason_str, "DeviceID");
@@ -447,7 +495,7 @@ static void http_write( char *msg, int fd, int modem_addr) {
                 
                 make_packet(PACKET_CMD_DASHSTART_S, 0x00, addr, 5, date_val, outpacket, &outpacketlen);
                 base64_encode(outpacket, outpacketlen , base_encode);
-                sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", modem_addr, base_encode);
+                sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", modem_addr, base_encode);
                 
             } else if (!strcmp(jobname, "dashStop")) {
                 char * value = from_json(jason_str, "DeviceID");
@@ -460,39 +508,69 @@ static void http_write( char *msg, int fd, int modem_addr) {
                 
                 make_packet(PACKET_CMD_DASHSTOP_S, 0x00, addr, 5, date_val, outpacket, &outpacketlen);
                 base64_encode(outpacket, outpacketlen , base_encode);
-                sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", modem_addr, base_encode);
+                sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", modem_addr, base_encode);
                 
             } else if (!strcmp(jobname, "raceStart")) {
                 char * value = from_json(jason_str, "DeviceID");
                 base64_decode(value, strlen(value), base_decode); //디바이스 아이디
 
                 int addr = getAddrFromDevices(base_decode);
-                
-                make_packet(PACKET_CMD_RACESTART_S, 0x00, addr, 0, NULL, outpacket, &outpacketlen);
-                base64_encode(outpacket, outpacketlen , base_encode);
-                sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", modem_addr, base_encode);
-                
-            }
 
+                for (int i=0; i< devices_count; i++ ) {
+                    //여기서 집접 모든 디바이스에 브로드 케스트 전송
+                    addr = devices[i].dev_addr;
+
+                    make_packet(PACKET_CMD_RACESTART_S, 0x00, addr, 0, NULL, outpacket, &outpacketlen);
+                    base64_encode(outpacket, outpacketlen , base_encode);
+                    sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", addr, base_encode);
+    
+                    struct gateway_op *message = message_queue_message_alloc_blocking(&uart_w_queue);
+                    message->operation = OP_WRITE_UART;
+
+                    unsigned char * message_txt_buf = malloc(MAX_PACKET_BUFFER);
+                    memset(message_txt_buf, 0x00 , MAX_PACKET_BUFFER);
+                    memcpy(message_txt_buf, cmd_buffer[cmd_id], MAX_PACKET_BUFFER);
+                    LOG_DEBUG("UART SEND TEXT : %s ", message_txt_buf);
+                    message->message_txt = message_txt_buf;
+                    message->uartfd = fd;
+                    message_queue_write(&uart_w_queue, message);
+                    LOG_DEBUG("message_queue_write");
+                }
+                is_uart_send = 0; //위에서 이미 전송 했음
+
+            } else if (!strcmp(jobname, "raceStop")) {
+                char * value = from_json(jason_str, "DeviceID");
+                base64_decode(value, strlen(value), base_decode); //디바이스 아이디
+
+                int addr = getAddrFromDevices(base_decode);
+                
+                make_packet(PACKET_CMD_RACESTOP_S, 0x00, addr, 0, NULL, outpacket, &outpacketlen);
+                base64_encode(outpacket, outpacketlen , base_encode);
+                sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", modem_addr, base_encode);
+
+            } else {
+                // json 파싱 종료
+                is_uart_send = 0;
+            }
 
         } else if (strcmp(res, "inspectionRequest") == 0) { //패턴2
             // 응답 받고 처리 할께 없음
-
+            is_uart_send = 0;
         } else if (strcmp(res, "tranningStart") == 0) { //패턴2
             // 응답 받고 처리 할께 없음
-
+            is_uart_send = 0;
         } else if (strcmp(res, "tranningStop") == 0) { //패턴2
             // 응답 받고 처리 할께 없음
-
+            is_uart_send = 0;
         } else if (strcmp(res, "dashStart") == 0) { //패턴2
             // 응답 받고 처리 할께 없음
-
+            is_uart_send = 0;
         } else if (strcmp(res, "dashStop") == 0) { //패턴2
             // 응답 받고 처리 할께 없음
-
+            is_uart_send = 0;
         } else if (strcmp(res, "raceStart") == 0) { //패턴2
             // 응답 받고 처리 할께 없음
-
+            is_uart_send = 0;
         } else if (strcmp(res, "ping") == 0) {
             LOG_DEBUG("ping %s\n", res);
             char * value = from_json(jason_str, "Value");
@@ -505,8 +583,8 @@ static void http_write( char *msg, int fd, int modem_addr) {
             LOG_DEBUG("vbase64_encode");
             base64_encode(outpacket, outpacketlen , base_encode);
 
-            sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", modem_addr, base_encode);
-            LOG_DEBUG("cmd_buffer[_AT_USER_CMD],");
+            sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", modem_addr, base_encode);
+            LOG_DEBUG("cmd_buffer[cmd_id],");
 
         } else if (strcmp(res, "inspectionResult") == 0) {
             
@@ -514,7 +592,8 @@ static void http_write( char *msg, int fd, int modem_addr) {
             
             base64_encode(outpacket, outpacketlen , base_encode);
 
-            sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", modem_addr, base_encode);
+            sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", modem_addr, base_encode);
+
         } else if (strcmp(res, "encryptionKeyRequest") == 0) {
             char * value = from_json(jason_str, "Value");
             base64_decode(value, strlen(value), base_decode);
@@ -523,7 +602,7 @@ static void http_write( char *msg, int fd, int modem_addr) {
             
             base64_encode(outpacket, outpacketlen , base_encode);
 
-            sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", modem_addr, base_encode);
+            sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", modem_addr, base_encode);
 
             //encrypt key update
             LOG_DEBUG("date + AES192 key\n");
@@ -538,7 +617,7 @@ static void http_write( char *msg, int fd, int modem_addr) {
             
             base64_encode(outpacket, outpacketlen , base_encode);
 
-            sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", modem_addr, base_encode);
+            sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", modem_addr, base_encode);
 
             //encrypt key update
             memcpy(Key, base_decode + 5, CRL_AES192_KEY); //24 byte key update
@@ -549,40 +628,55 @@ static void http_write( char *msg, int fd, int modem_addr) {
             
             base64_encode(outpacket, outpacketlen , base_encode);
 
-            sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", modem_addr, base_encode);
+            sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", modem_addr, base_encode);
 
         } else if (strcmp(res, "dashResult") == 0) {
             make_packet(PACKET_CMD_INSPECTION_RES_S, 0x00, modem_addr, 0, NULL, outpacket, &outpacketlen);
             
             base64_encode(outpacket, outpacketlen , base_encode);
 
-            sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", modem_addr, base_encode);
+            sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", modem_addr, base_encode);
 
         } else if (strcmp(res, "raceCycleResult") == 0) {
             // 응답 받고 처리 할께 없음
+            is_uart_send = 0;
         } else {
-            // json 파싱에러가 종료
-            return;
+            // json 파싱 종료
+            is_uart_send = 0;
         }
 
         // uart 전송 요청
-        struct gateway_op *message = message_queue_message_alloc_blocking(&uart_w_queue);
-        message->operation = OP_WRITE_UART;
+        if (is_uart_send == 1) {
+            if ( cmd_id == _AT_USER_CMD ) {
+                // rf 패킷 
+                struct gateway_op *message = message_queue_message_alloc_blocking(&uart_w_queue);
+                message->operation = OP_WRITE_UART;
 
-        unsigned char * message_txt_buf = malloc(MAX_PACKET_BUFFER);
-        memset(message_txt_buf, 0x00 , MAX_PACKET_BUFFER);
-        memcpy(message_txt_buf, cmd_buffer[_AT_USER_CMD], MAX_PACKET_BUFFER);
-        LOG_DEBUG("UART SEND TEXT : %s ", message_txt_buf);
-        message->message_txt = message_txt_buf;
-        message->uartfd = fd;
-        message_queue_write(&uart_w_queue, message);
-        LOG_DEBUG("message_queue_write");
+                unsigned char * message_txt_buf = malloc(MAX_PACKET_BUFFER);
+                memset(message_txt_buf, 0x00 , MAX_PACKET_BUFFER);
+                memcpy(message_txt_buf, cmd_buffer[cmd_id], MAX_PACKET_BUFFER);
+                LOG_DEBUG("UART SEND TEXT : %s ", message_txt_buf);
+                message->message_txt = message_txt_buf;
+                message->uartfd = fd;
+                message_queue_write(&uart_w_queue, message);
+                LOG_DEBUG("message_queue_write");
+            } else {
+                // AT command
+                struct gateway_op *message = message_queue_message_alloc_blocking(&uart_w_queue);
+                LOG_DEBUG("SEDND : %s \n", (char *)cmd_buffer[cmd_id]);
+                message->operation = OP_WRITE_UART;
 
-
+                cmd_state = cmd_id; //이전 전송 메세지를 할당
+                
+                unsigned char * buf;
+                buf = malloc(MAX_PACKET_BUFFER);
+                memcpy(buf, cmd_buffer[cmd_id], MAX_PACKET_BUFFER);
+                message->message_txt = buf;
+                message->uartfd = fd;
+                message_queue_write(&uart_w_queue, message);
+            }
+        }
         free(outmsg);
-        LOG_DEBUG("free");
-
-        
     }    
 }
 
@@ -591,11 +685,6 @@ void init_uart_data() {
         uart_data[i].state = UART_INACTIVE;
     }
 }
-
-// AT cmd 전송 함수 구현 해야 한다.
-
-
-
 
 // JSON 만들기
 char * make_json(char * key, char * value) 
@@ -634,6 +723,13 @@ char * from_json(const char * json, char * key)
 
 int main(int argc, char *argv[]) {
 
+    if ( argc == 2 ) {
+        ssl_server_ip = malloc(16);
+        memset(ssl_server_ip, 0x00 , 16);
+        memcpy(ssl_server_ip, argv[1], strlen(argv[1]));
+        LOG_DEBUG("SSL Server IP : %s", ssl_server_ip);
+    }
+
     main_thread = pthread_self();
     threads_init();
 
@@ -644,7 +740,6 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    
     int server_sockfd, client_sockfd = 0; 
     int client_len;
 
@@ -711,7 +806,6 @@ int main(int argc, char *argv[]) {
                             message->socketfd = client_sockfd;
                             
                             message_queue_write(&socket_queue, message);
-
                         }
                     }
 
@@ -727,6 +821,10 @@ int main(int argc, char *argv[]) {
         close(server_sockfd);
         uart_close(uart_fd);
 
+        if (ssl_server_ip != NULL) {
+            free(ssl_server_ip);
+        }
+
         LOG_DEBUG("End of GateWay Daemon!\n");
 
         return 0;
@@ -735,8 +833,6 @@ int main(int argc, char *argv[]) {
         perror("Error listening on uart or socket");
     }
 }
-
-
 
 /*
 url , 전달 데이터를 주면 서버에 
@@ -756,9 +852,17 @@ void SSLServerSend(char *url, char *value, int valuelen, int modem_addr) {
         memset(base_encode, 0x00, sizeof(base_encode));
         base64_encode(value, valuelen , base_encode);
         char *json = make_json("Value", base_encode);
-        sprintf(buf, HTTPS_HEADER, url,  HTTPS_IP_ADDR, HTTPS_PORT_NUM, json);
+        if (ssl_server_ip == NULL) {
+            sprintf(buf, HTTPS_HEADER, url,  HTTPS_IP_ADDR, HTTPS_PORT_NUM, json);
+        } else {
+            sprintf(buf, HTTPS_HEADER, url,  ssl_server_ip, HTTPS_PORT_NUM, json);
+        }
     } else {
-        sprintf(buf, HTTPS_HEADER, url,  HTTPS_IP_ADDR, HTTPS_PORT_NUM, "");
+        if (ssl_server_ip == NULL) {
+            sprintf(buf, HTTPS_HEADER, url,  HTTPS_IP_ADDR, HTTPS_PORT_NUM, "");
+        } else {
+            sprintf(buf, HTTPS_HEADER, url,  ssl_server_ip, HTTPS_PORT_NUM, "");
+        }
     }
 
     message->message_txt = buf;
