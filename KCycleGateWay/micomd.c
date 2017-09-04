@@ -874,8 +874,10 @@ int packet_process(unsigned char * inputpacket, int addr)
             break;
 
             case PACKET_CMD_RACELINERESULT_R:
-            LOG_DEBUG("cmd PACKET_CMD_RACELINERESULT_R");
-        
+            LOG_DEBUG("cmd PACKET_CMD_RACELINERESULT_R : len %d", len);
+            
+            BIO_dump_fp(stdout, valuebuf, len);
+            LOG_DEBUG("cmd PACKET_CMD_RACELINERESULT_R : len %d", len);
             SSLServerSend("/gateway/raceLineResult", valuebuf, len, addr);
             break;
 

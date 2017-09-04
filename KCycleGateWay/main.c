@@ -66,7 +66,7 @@ static int SSLCMD = 0;
 static int uart_fd = 0;
 
 char * ssl_server_ip = NULL;
-extern char * ssl_server_ip;
+
 
 static void *uart_write_threadproc(void *dummy) {
     LOG_DEBUG("uart_write_threadproc start\n");
