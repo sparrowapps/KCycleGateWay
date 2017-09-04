@@ -543,10 +543,28 @@ ParingInfo : [
                 base64_decode(value, strlen(value), base_decode); //디바이스 아이디
 
                 int addr = getAddrFromDevices(base_decode);
-                
-                make_packet(PACKET_CMD_RACESTOP_S, 0x00, addr, 0, NULL, outpacket, &outpacketlen);
-                base64_encode(outpacket, outpacketlen , base_encode);
-                sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", modem_addr, base_encode);
+
+                for (int i=0; i< devices_count; i++ ) {
+                    //여기서 집접 모든 디바이스에 브로드 케스트 전송
+                    addr = devices[i].dev_addr;
+
+                    make_packet(PACKET_CMD_RACESTOP_S, 0x00, addr, 0, NULL, outpacket, &outpacketlen);
+                    base64_encode(outpacket, outpacketlen , base_encode);
+                    sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", addr, base_encode);
+    
+                    struct gateway_op *message = message_queue_message_alloc_blocking(&uart_w_queue);
+                    message->operation = OP_WRITE_UART;
+
+                    unsigned char * message_txt_buf = malloc(MAX_PACKET_BUFFER);
+                    memset(message_txt_buf, 0x00 , MAX_PACKET_BUFFER);
+                    memcpy(message_txt_buf, cmd_buffer[cmd_id], MAX_PACKET_BUFFER);
+                    LOG_DEBUG("UART SEND TEXT : %s ", message_txt_buf);
+                    message->message_txt = message_txt_buf;
+                    message->uartfd = fd;
+                    message_queue_write(&uart_w_queue, message);
+                    LOG_DEBUG("message_queue_write");
+                }
+                is_uart_send = 0; //위에서 이미 전송 했음
 
             } else {
                 // json 파싱 종료
