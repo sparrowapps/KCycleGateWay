@@ -30,7 +30,7 @@ Description :
 #include "logger.h"
 #include "base64.h"
 #include <jansson.h>
-
+#include "crc.h"
 // function prototype
 static void handle_uart_data(int fd);
 static void handle_uart_request(int fd, char *request);
@@ -705,12 +705,12 @@ void init_uart_data() {
 }
 
 // JSON 만들기
-char * make_json(char * key, char * value) 
+char * make_json(int addr, char * value) 
 {
     json_t* root;
     char * str;
 
-    root  = json_pack("{s:s}", key, value);
+    root  = json_pack("{s:i, s:s}", "Addr", addr, "Value", value);
     str = json_dumps(root, JSON_ENCODE_ANY);
     return str;
 }
@@ -747,6 +747,15 @@ int main(int argc, char *argv[]) {
         memcpy(ssl_server_ip, argv[1], strlen(argv[1]));
         LOG_DEBUG("SSL Server IP : %s", ssl_server_ip);
     }
+
+    #if 0
+    short crc = crc16("123456789", 9);
+    char a[2];
+    a[0] = crc % 256;
+    a[1] = crc / 256;
+    LOG_DEBUG("%x %x",a[0],a[1]);
+    return 0;
+    #endif
 
     main_thread = pthread_self();
     threads_init();
@@ -869,7 +878,7 @@ void SSLServerSend(char *url, char *value, int valuelen, int modem_addr) {
     if (value != NULL) {
         memset(base_encode, 0x00, sizeof(base_encode));
         base64_encode(value, valuelen , base_encode);
-        char *json = make_json("Value", base_encode);
+        char *json = make_json(modem_addr, base_encode);
         if (ssl_server_ip == NULL) {
             sprintf(buf, HTTPS_HEADER, url,  HTTPS_IP_ADDR, HTTPS_PORT_NUM, json);
         } else {

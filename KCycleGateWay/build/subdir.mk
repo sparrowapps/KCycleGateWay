@@ -5,6 +5,7 @@ C_SRCS += \
 ../micomd.c \
 ../ssltest.c \
 ../uart.c \
+../crc.c \
 ../base64.c
 
 OBJS += \
@@ -13,6 +14,7 @@ OBJS += \
 ./micomd.o \
 ./ssltest.o \
 ./uart.o \
+./crc.o \
 ./base64.o
 
 C_DEPS += \
@@ -21,6 +23,7 @@ C_DEPS += \
 ./micomd.d \
 ./ssltest.d \
 ./uart.d \
+./crc.d \
 ./base64.d
 
 # Each subdirectory must supply rules for building sources it contributes

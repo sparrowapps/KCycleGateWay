@@ -230,6 +230,8 @@ typedef struct list_id {
 #define PACKET_CMD_RACESTOP_S      0x39
 #define PACKET_CMD_RACESTOP_R      0x3A
 
+#define PACKET_CMD_RETRY           0xFF // 재전송 요구 및 재전송 패킷
+
 #define RST 9
 #define PIO 7
 

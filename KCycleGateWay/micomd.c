@@ -29,6 +29,7 @@
 #include "ssltest.h"
 #include "logger.h"
 #include "base64.h"
+#include "crc.h"
 
 // common variables for threads
 int uart_fd;
@@ -76,6 +77,14 @@ int devices_count = 0; //디바이스 수
 // 2개
 int packetnumberArray[MAX_DEVICES] = {0,};
 // Key reset 되면 0
+
+
+// 재전송 카운트
+int retryCountDevice[MAX_DEVICES] = {0,}; // 디바이스가 재전송 횟수
+int retryCountGateway[MAX_DEVICES] = {0,}; // 게이트웨이가 재전송 횟수
+
+unsigned char last_packet_buffer[MAX_DEVICES][MAX_PACKET_BUFFER]; //마지막 만든 패킷 
+int last_packet_len[MAX_DEVICES] = {0,};
 
 /* Key to be used for AES encryption/decryption */
 unsigned char Key[CRL_AES192_KEY] =
@@ -785,8 +794,35 @@ int packet_process(unsigned char * inputpacket, int addr)
             packetnumberArray[addr] ++;
         }
 #endif
+        // 게이트웨이  retry count 초기화
+        if(code != PACKET_CMD_RETRY) {
+            retryCountGateway[addr] = 0;
+        }
+
+        // 디바이스 retrty count 초기화
+        retryCountDevice[addr] = 0;
+
         switch (code)
         {
+            case PACKET_CMD_RETRY:
+            //마지막 패킷을 재전송 한다.
+            if (retryCountGateway[addr] > 3) {
+                retryCountGateway[addr] = 0 ;
+                
+                LOG_DEBUG("GATEWAY RETRY COUNT EXCEED");
+                valuebuf[0] = 12;
+                valuebuf[1] = 1;
+                SSLServerSend("/gateway/errorCheck", valuebuf, 2, addr);
+            } else {
+                cmd_id = _AT_USER_CMD;
+    
+                base64_encode(last_packet_buffer[addr], last_packet_len[addr] , base_encode);
+                sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", addr, base_encode);    
+                ipc_send_flag = 1;
+                retryCountGateway[addr] ++;
+            }
+            break;
+
             case PACKET_CMD_PING_R:
             //todo 내 senderid 를 만들어야 한다.
             LOG_DEBUG("cmd PACKET_CMD_PING_R");
@@ -925,6 +961,27 @@ int packet_process(unsigned char * inputpacket, int addr)
             //nothing todo
             break;
         }
+    } else {
+        //retry 요청 전송
+        if (retryCountDevice[addr] > 3) {
+            retryCountDevice[addr] = 0 ;
+            
+            LOG_DEBUG("DEVCIE RETRY COUNT EXCEED");
+            valuebuf[0] = 11;
+            valuebuf[1] = 1;
+            SSLServerSend("/gateway/errorCheck", valuebuf, 2, addr);
+        } else {
+            retryCountDevice[addr] ++;
+
+            unsigned char outpacket[MAX_PACKET_BUFFER];
+            memset(outpacket, 0x00, sizeof(outpacket));
+
+            cmd_id = _AT_USER_CMD;
+            make_packet(0xff, 0x00, addr, 0, NULL, outpacket, &outpacketlen);
+            base64_encode(outpacket, outpacketlen , base_encode);
+            sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", addr, base_encode);    
+            ipc_send_flag = 1;
+        }
     }
     
     return 0;
@@ -950,10 +1007,18 @@ int extract_packet (unsigned char * inputpacket,
 
     //pn = (short)(packetnumber[1] << 8) +  (short)(packetnumber[0]);
     *outpn = (short)inputpacket[5] + (short)(inputpacket[6] << 8);
-    LOG_DEBUG("validate_ac before\n");
+    *outlen = *(inputpacket + 12);
+
+    short orgcrc ;
+    memcpy(&orgcrc, (void *)(inputpacket + 13 + *outlen), 2);
+
+    short crc = crc16(inputpacket, 13 + *outlen );
+    if (orgcrc != crc ) {
+        LOG_DEBUG("CRC error RCRC :%04x  G CRC:%04x", orgcrc, crc);
+        return -1;
+    }   
+    
     if (validate_ac(inputpacket + 2, *outpn, inputpacket + 2) == 0){
-        *outlen = *(inputpacket + 12);
-        
         //plaintext
 #ifdef _PACKET_ENCRYPTY
         int decslength = decrypt_block(dec_out, inputpacket + 13, *outlen, Key, IV);
@@ -993,9 +1058,6 @@ void make_packet(char code,
     make_ac_code(dev_id, pn, ac);
     memcpy(packetbuf + 2, ac, 10);
     
-
-    LOG_DEBUG("make_packet mode_addr : %d", addr);
-
     int encslength = 0;
     if (value != NULL ) {
 #ifdef _PACKET_ENCRYPTY        
@@ -1010,10 +1072,18 @@ void make_packet(char code,
         encslength = len;
 #endif        
     }
-    BIO_dump_fp(stdout, packetbuf, 13 + encslength);
+    
     memcpy(out_packet, packetbuf, 13 + encslength);
+    short crc = crc16(packetbuf, 13 + encslength);
 
-    *outlen = 13 + encslength;
+    memcpy(out_packet + 13 + encslength, crc, 2); // crc 추가
+    BIO_dump_fp(stdout, out_packet, 13 + encslength + 2);
+    *outlen = 13 + encslength + 2; //crc size 추가
+
+    //마지막 패킷을 보관 한다.
+    memset(last_packet_buffer[addr], 0x00, MAX_PACKET_BUFFER);
+    memcpy(last_packet_buffer[addr], out_packet, 13 + encslength + 2);
+    last_packet_len[addr] = 13 + encslength + 2;
 }
 
 // AC 코드 확인
