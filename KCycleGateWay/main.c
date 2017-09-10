@@ -392,12 +392,16 @@ PairingInfo : [
 #if 1
             json_t *root;
             json_error_t error;
-            char * grp_id;
-            char * chn;
-            char * band;
-            char * drate;
+            char  *grp_id;
+            int chn;
+            int band;
+            int drate;
             int count;
             char decode_grp_id[10] = {0,};
+            char encode_grp_id[10] = {0,};
+            char buf[4] = {0x69, 0xcf, 0x38, 0x00};
+            base64_encode(buf, 3, encode_grp_id);
+            LOG_DEBUG("base 64 :%s ", encode_grp_id);
             
             json_t *pairinginfo;
             root = json_loads(jason_str, 0, &error);
@@ -410,10 +414,23 @@ PairingInfo : [
                 "COUNT", &count, 
                 "PairingInfo", &pairinginfo
             );
-            base64_encode(grp_id, strlen(grp_id) , decode_grp_id);
+
+            LOG_DEBUG("GRP_ID : %s  :  %d", grp_id, strlen(grp_id));
+
+            
+
+ 
+
+            base64_decode("acOPOA==", 8 , decode_grp_id);
+
+            LOG_DEBUG("GRP_ID : %02x %02x %02x", decode_grp_id[0], decode_grp_id[1], decode_grp_id[2]);
+            LOG_DEBUG("CHN : %d", chn);
+            LOG_DEBUG("BAND : %d", band);
+            LOG_DEBUG("DRATE : %d", drate);
 
             //AT command parameter update
-            sprintf(cmd_buffer[_AT_GRP_ID], AT_GRP_ID_FMT, decode_grp_id[0], decode_grp_id[1], decode_grp_id[2]);
+            // sprintf(cmd_buffer[_AT_GRP_ID], AT_GRP_ID_FMT, decode_grp_id[0], decode_grp_id[1], decode_grp_id[2]);
+            sprintf(cmd_buffer[_AT_GRP_ID], AT_GRP_ID_FMT, 0x69, 0xcf, 0x38);
             sprintf(cmd_buffer[_AT_CHN], AT_CHN_FMT, chn);
             sprintf(cmd_buffer[_AT_FBND], AT_FBAND_FMT, band);
             sprintf(cmd_buffer[_AT_DRATE], AT_DRATE_FMT, drate);
@@ -451,7 +468,7 @@ PairingInfo : [
                 }
                 dev_id_str = json_string_value(dev_id);
                 memset(decode_dev_id, 0x00, sizeof(decode_dev_id));
-                base64_encode(dev_id_str, strlen(dev_id_str) , decode_dev_id);
+                base64_decode(dev_id_str, strlen(dev_id_str) , decode_dev_id);
 
                 dev_addr = json_object_get(data, "DEV_ADDR");
                 if(!json_is_string(dev_addr))
@@ -838,6 +855,14 @@ static void sig_handler(int signal) {
 }
 
 int main(int argc, char *argv[]) {
+
+
+    // char encode_grp_id[10] = {0,};
+    // char buf[4] = {0x69, 0xcf, 0x38, 0x00};
+    // base64_encode(buf, 3, encode_grp_id);
+    // LOG_DEBUG("base 64 :%s ", encode_grp_id);
+
+    // return 0;
 
     signal(SIGINT, (void *)sig_handler);
 

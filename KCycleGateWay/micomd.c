@@ -664,11 +664,18 @@ int check_uart (PBYTE data_buf)
                 break;
 
             case _AT_DRATE:
-
+            case _AT_REG_ID:
                 if (manaual_pairinig_status == _MANUAL_PAIRING_STATUS) {
+#if 1  //되돌려야 함                  
+                    cmd_id = _AT_RST;
+                    rst_status = _RESET_STATUS;
+                    data_status = _DATA_RF_MODE;
+                    ipc_send_flag = 1;
+                    break;
+#endif                    
                     cmd_id = _AT_REG_ID;
                     // 디바이스 리스트 를 엎어야 한다.
-                    sprintf(cmd_buffer[_AT_REG_ID], AT_GRP_ID_FMT, devices[device_idx].dev_addr, 
+                    sprintf(cmd_buffer[_AT_REG_ID], AT_REG_ID_FMT, devices[device_idx].dev_addr, 
                         devices[device_idx].dev_id[0], 
                         devices[device_idx].dev_id[1], 
                         devices[device_idx].dev_id[2]);
