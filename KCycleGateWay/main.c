@@ -164,15 +164,25 @@ static void threads_destroy() {
     poison_socket->operation = OP_EXIT;
     message_queue_write(&socket_queue, poison_socket);
 
+    LOG_DEBUG("thread uart_write_thread join....\n");
     pthread_join(uart_write_thread, NULL);
+    LOG_DEBUG("thread uart_read_thread join....\n");
     pthread_join(uart_read_thread, NULL);
+    LOG_DEBUG("thread http_write_thread join....\n");
     pthread_join(http_write_thread, NULL);
+    LOG_DEBUG("thread socket_read_thread join....\n");
     pthread_join(socket_read_thread, NULL);
 
+    LOG_DEBUG("thread uart_r_queue destry....\n");
     message_queue_destroy(&uart_r_queue);
+    LOG_DEBUG("thread uart_w_queue destry....\n");
     message_queue_destroy(&uart_w_queue);
+    LOG_DEBUG("thread https_queue destry....\n");
     message_queue_destroy(&https_queue);
+    LOG_DEBUG("thread socket_queue destry....\n");
     message_queue_destroy(&socket_queue);
+
+    LOG_DEBUG("threads_destroyed \n");
 }
 
 // MARK: uart data processing
@@ -739,7 +749,19 @@ char * from_json(const char * json, char * key)
     return res;
 }
 
+/*
+list_end
+*/
+static void sig_handler(int signal) {
+    LOG_DEBUG("End of GateWay Daemon!\n");
+    threads_destroy();
+    exit(0);
+}
+
+
 int main(int argc, char *argv[]) {
+
+    signal(SIGINT, (void *)sig_handler);
 
     if ( argc == 2 ) {
         ssl_server_ip = malloc(16);
@@ -853,6 +875,7 @@ int main(int argc, char *argv[]) {
         }
 
         LOG_DEBUG("End of GateWay Daemon!\n");
+        threads_destroy();
 
         return 0;
 

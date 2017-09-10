@@ -118,6 +118,8 @@ BYTE cmd_buffer[MAX_CMD][MAX_PACKET_BUFFER] =
     "AT+RST=1\r\n",                     // 12
     "AT+LST_ID?\r\n",                   // 13
     "AT+REG_#ID=2, 01 23 45\r\n",       // 14
+    "AT+GRP_ID?\r\n",                   // 15
+    "AT+MADD?\r\n",                     // 16
     "",
 };
 
@@ -707,9 +709,30 @@ int check_uart (PBYTE data_buf)
         {
             hex_decode((char *)(data_buf + 3*i), 1, &dev_id[i]);
         
-            LOG_DEBUG("device_id[%d] = %x    \n", i, dev_id[i]);
+            LOG_DEBUG("device_id[%d] = %02x    \n", i, dev_id[i]);
         }
-        cmd_id = _AT_LST_ID;
+        cmd_id = _AT_GRP_ID_GET;
+        ipc_send_flag = 1;
+    }
+    else if (cmd_state == _AT_GRP_ID_GET) //GRP_ID  얻기
+    {
+        int i = 0;
+        unsigned char grp_id[3]={0,};
+        
+        for(i = 0; i < 3; i++)
+        {
+            hex_decode((char *)(data_buf + 3*i), 1, &grp_id[i]);
+        
+            LOG_DEBUG("group id[%d] = %02x    \n", i, grp_id[i]);
+        }
+        cmd_id = _AT_MADD_GET;
+        ipc_send_flag = 1;
+    }
+    else if (cmd_state == _AT_MADD_GET) // MADD 얻기
+    {
+        LOG_DEBUG("MADD : %s", data_buf);
+
+        cmd_id = _AT_LST_ID; //
         ipc_send_flag = 1;
     }
     else if(cmd_state == _AT_LST_ID)
@@ -738,7 +761,7 @@ int check_uart (PBYTE data_buf)
                 for(i = 0; i < 3; i++)
                 {
                     hex_decode((char *)(token + 3*i), 1, &devices[device_idx].dev_id[i]);
-                    LOG_DEBUG("device_id[%d] = %x    \n", i, devices[device_idx].dev_id[i]);
+                    LOG_DEBUG("device_id[%d] = %02x    \n", i, devices[device_idx].dev_id[i]);
                 }
                 device_idx++;
             }
@@ -751,7 +774,7 @@ int check_uart (PBYTE data_buf)
             LOG_DEBUG("======   list in devices[%d]   ======\n", device_idx);
             for(it = 0; it < device_idx; it++)
             {
-                LOG_DEBUG("device[%d] addr = %d, id = [%x %x %x]\n", it, devices[it].dev_addr, devices[it].dev_id[0], devices[it].dev_id[1], devices[it].dev_id[2]);
+                LOG_DEBUG("device[%d] addr = %d, id = [%02x %02x %02x]\n", it, devices[it].dev_addr, devices[it].dev_id[0], devices[it].dev_id[1], devices[it].dev_id[2]);
             }
 
             devices_count = device_idx; //장비 개수 
@@ -1170,7 +1193,6 @@ BYTE* hex_decode(char *in, int len, BYTE *out)
             ln = in[i+1] > '9' ? (in[i+1]|32) - 'a' + 10 : in[i+1] - '0';
 
             out[t] = (hn << 4 ) | ln;
-            printf("0x%x \n", out[t]);
     }
     return out;
 }

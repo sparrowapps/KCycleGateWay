@@ -150,7 +150,9 @@ typedef enum AT_CMD {
     _AT_RST      = 12,
     _AT_LST_ID   = 13,
     _AT_REG_ID   = 14,
-    _AT_USER_CMD = 15, 
+    _AT_GRP_ID_GET = 15,
+    _AT_MADD_GET   = 16,
+    _AT_USER_CMD = 17, 
     _AT_CMD_NONE = 19, 
 } AT_CMD_TYPE;          
 
