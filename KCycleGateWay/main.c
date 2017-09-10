@@ -332,6 +332,11 @@ static void http_write( char *msg, int fd, int modem_addr) {
 
         jason_str = strstr(outmsg, "\r\n\r\n") + 4;
         jason_str = strstr(jason_str, "\r\n") + 2;
+        if (jason_str == NULL) {
+            LOG_DEBUG("http response JSON string error !!");
+            return; 
+        }
+
         LOG_DEBUG("JASON String bio dump...........\n");
         BIO_dump_fp(stdout, jason_str, strlen(jason_str));
 
@@ -837,8 +842,6 @@ static void sig_handler(int signal) {
 int main(int argc, char *argv[]) {
 
     signal(SIGINT, (void *)sig_handler);
-
-    
 
     if ( argc == 2 ) {
         ssl_server_ip = malloc(16);
