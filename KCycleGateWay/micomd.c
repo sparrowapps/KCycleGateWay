@@ -1076,7 +1076,7 @@ void make_packet(char code,
     memcpy(out_packet, packetbuf, 13 + encslength);
     short crc = crc16(packetbuf, 13 + encslength);
 
-    memcpy(out_packet + 13 + encslength, crc, 2); // crc 추가
+    memcpy(out_packet + 13 + encslength, (unsigned char *)&crc, 2); // crc 추가
     BIO_dump_fp(stdout, out_packet, 13 + encslength + 2);
     *outlen = 13 + encslength + 2; //crc size 추가
 
