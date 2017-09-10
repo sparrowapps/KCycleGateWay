@@ -722,6 +722,11 @@ int check_uart (PBYTE data_buf)
         {
             LOG_DEBUG("token = %s   strlen = %d \n", token, strlen(token));
 
+            if (!strcmp(token, "NONE")) { // 페어링 정보가 없는경우
+                list_end = 1;
+                break; 
+            }
+
             if(strlen(token) >= 1 && strlen(token) < 4)
             {
                 devices[device_idx].dev_addr = atoi(token);
