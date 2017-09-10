@@ -171,10 +171,10 @@ typedef enum REST_STATUS {
     _RESET_STATUS = 1,
 } RESET_STATUS_TYPE;
 
-typedef enum MANUAL_PARING_STATUS {
-    _MANUAL_PARING_NONE = 0,
-    _MANUAL_PARING_STATUS = 1,
-} MANUAL_PARING_STATUS_TYPE;
+typedef enum MANUAL_PAIRING_STATUS {
+    _MANUAL_PAIRING_NONE = 0,
+    _MANUAL_PAIRING_STATUS = 1,
+} MANUAL_PAIRING_STATUS_TYPE;
 
 // 계측기 리스트 
 typedef struct list_id {
@@ -298,7 +298,7 @@ extern BYTE dev_id[3];
 extern unsigned char Key[CRL_AES192_KEY];
 extern list devices[MAX_DEVICES]; // 페어링 정보를 여기에 넣는다.
 extern int devices_count;
-extern MANUAL_PARING_STATUS_TYPE manaual_parinig_status;
+extern MANUAL_PAIRING_STATUS_TYPE manaual_pairinig_status;
 
 extern int packetnumberArray[MAX_DEVICES];
 extern int gatewayPacketNumber;

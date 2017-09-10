@@ -374,7 +374,7 @@ static void http_write( char *msg, int fd, int modem_addr) {
                 make_packet(PACKET_CMD_INSPECTION_REQ_S, 0x00, addr, 1, &irvalue, outpacket, &outpacketlen);
                 base64_encode(outpacket, outpacketlen , base_encode);
                 sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", addr, base_encode);    
-            } else if (!strcmp(jobname, "paringInfo"))  {
+            } else if (!strcmp(jobname, "pairingInfo"))  { //pairingInfo
 
 
 /*
@@ -383,7 +383,7 @@ CHN : 숫자값
 BAND : 숫자값
 DRATE : 숫자값
 COUNT : 숫자값
-ParingInfo : [
+PairingInfo : [
     DEV_ID : base64(3) 
     DEV_ADDR : 숫자값
 ]
@@ -398,7 +398,7 @@ ParingInfo : [
             int count;
             char decode_grp_id[10] = {0,};
             
-            json_t *paringinfo;
+            json_t *pairinginfo;
             root = json_loads(jason_str, 0, &error);
             
             json_unpack(root, "{s:s, s:i, s:i, s:i, s:i, s:[s:s, s:i] }", 
@@ -407,7 +407,7 @@ ParingInfo : [
                 "BAND", &band, 
                 "DRATE", &drate, 
                 "COUNT", &count, 
-                "ParingInfo", &paringinfo
+                "PairingInfo", &pairinginfo
             );
             base64_encode(grp_id, strlen(grp_id) , decode_grp_id);
 
@@ -424,19 +424,19 @@ ParingInfo : [
             LOG_DEBUG("[_AT_DRATE] : %s\n", cmd_buffer[_AT_DRATE]);
             
             cmd_id = _AT_START; // +++ 전송
-            manaual_parinig_status = _MANUAL_PARING_STATUS; // 메뉴얼 페어링 스테이터스
+            manaual_pairinig_status = _MANUAL_PAIRING_STATUS; // 메뉴얼 페어링 스테이터스
             data_status = _DATA_AT_MODE;
 
-            LOG_DEBUG("total paring devices count : %d\n", count);
+            LOG_DEBUG("total pairing devices count : %d\n", count);
             devices_count = count;
 
-            for (int i = 0; i < json_array_size(paringinfo); i++)
+            for (int i = 0; i < json_array_size(pairinginfo); i++)
             {
                 json_t *data, *dev_id, *dev_addr;
                 const char * dev_id_str;
                 int dev_addr_val;
                 char decode_dev_id[10] = {0,};
-                data = json_array_get(paringinfo, i);
+                data = json_array_get(pairinginfo, i);
                 if(!json_is_object(data))
                 {
                     LOG_DEBUG("error: commit data %d is not an object\n", (int)(i + 1));

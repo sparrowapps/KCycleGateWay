@@ -69,7 +69,7 @@ DATA_STATUS_TYPE data_status = _DATA_RF_MODE; // AT 커맨드로 데이터를 �
 RESET_STATUS_TYPE rst_status = _RESET_NONE;  // AT reset 처리 했을때 1
 int device_idx = 0; 
 
-MANUAL_PARING_STATUS_TYPE manaual_parinig_status = _MANUAL_PARING_NONE;
+MANUAL_PAIRING_STATUS_TYPE manaual_pairinig_status = _MANUAL_PAIRING_NONE;
 
 list devices[MAX_DEVICES];
 int devices_count = 0; //디바이스 수
@@ -600,7 +600,7 @@ int check_uart (PBYTE data_buf)
         {
             case _AT_ACODE:
 
-                if (manaual_parinig_status == _MANUAL_PARING_STATUS )
+                if (manaual_pairinig_status == _MANUAL_PAIRING_STATUS )
                 {
                     cmd_id = _AT_GRP_ID;
                     ipc_send_flag = 1;
@@ -634,7 +634,7 @@ int check_uart (PBYTE data_buf)
                 break;
 
             case _AT_FBND:
-                if (manaual_parinig_status == _MANUAL_PARING_STATUS) {
+                if (manaual_pairinig_status == _MANUAL_PAIRING_STATUS) {
                     cmd_id = _AT_CHN;
                 } else {               
                     cmd_id = _AT_MADD;
@@ -648,7 +648,7 @@ int check_uart (PBYTE data_buf)
                 break;
 
             case _AT_CHN:
-                if (manaual_parinig_status == _MANUAL_PARING_STATUS) {
+                if (manaual_pairinig_status == _MANUAL_PAIRING_STATUS) {
                     cmd_id = _AT_DRATE;
                     device_idx = 0;
                 } else {
@@ -665,7 +665,7 @@ int check_uart (PBYTE data_buf)
 
             case _AT_DRATE:
 
-                if (manaual_parinig_status == _MANUAL_PARING_STATUS) {
+                if (manaual_pairinig_status == _MANUAL_PAIRING_STATUS) {
                     cmd_id = _AT_REG_ID;
                     // 디바이스 리스트 를 엎어야 한다.
                     sprintf(cmd_buffer[_AT_REG_ID], AT_GRP_ID_FMT, devices[device_idx].dev_addr, 
