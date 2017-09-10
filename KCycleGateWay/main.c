@@ -337,6 +337,7 @@ static void http_write( char *msg, int fd, int modem_addr) {
             return; 
         }
 
+        LOG_DEBUG("\nJSON STRING Bio_dump");
         BIO_dump_fp(stdout, jason_str, strlen(jason_str));
 
         char * res = from_json(jason_str, "Result");
@@ -420,7 +421,7 @@ PairingInfo : [
             // command 
             LOG_DEBUG("[_AT_GRP_ID] : %s\n", cmd_buffer[_AT_GRP_ID]);
             LOG_DEBUG("[_AT_CHN] : %s\n", cmd_buffer[_AT_CHN]);
-            LOG_DEBUG("[_AT_FBND] : %s\n", cmd_buffer[_AT_GRP_ID]);
+            LOG_DEBUG("[_AT_FBND] : %s\n", cmd_buffer[_AT_FBND]);
             LOG_DEBUG("[_AT_DRATE] : %s\n", cmd_buffer[_AT_DRATE]);
             
             cmd_id = _AT_START; // +++ 전송
