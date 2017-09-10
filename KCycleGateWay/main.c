@@ -332,17 +332,14 @@ static void http_write( char *msg, int fd, int modem_addr) {
 
         jason_str = strstr(outmsg, "\r\n\r\n") + 4;
         jason_str = strstr(jason_str, "\r\n") + 2;
-        if (jason_str == NULL) {
+        if (jason_str > outmsg + outmsglen) {
             LOG_DEBUG("http response JSON string error !!");
             return; 
         }
 
-        LOG_DEBUG("JASON String bio dump...........\n");
         BIO_dump_fp(stdout, jason_str, strlen(jason_str));
 
-        LOG_DEBUG("jason before\n");
         char * res = from_json(jason_str, "Result");
-        LOG_DEBUG("jason afte %s\n", res);
 
         // whatIsMyJob 처리
         if (!strcmp(res, "whatIsMyJob")) { // 패턴2
