@@ -749,19 +749,96 @@ char * from_json(const char * json, char * key)
     return res;
 }
 
+
 /*
-list_end
+url , 전달 데이터를 주면 서버에 
+SSL request JSON을 포함해서 전송 한다.
+value 가 없을 경우 데이터 없이 전송 한다.
 */
+void SSLServerSend(char *url, char *value, int valuelen, int modem_addr) {
+
+    unsigned char * buf;
+    unsigned char base_encode[MAX_HTTPS_PACKET_BUFFER];
+
+    struct gateway_op *message = message_queue_message_alloc_blocking(&https_queue);
+    message->operation = OP_WRITE_HTTP;
+    buf = malloc(MAX_HTTPS_PACKET_BUFFER);
+
+    if (value != NULL) {
+        memset(base_encode, 0x00, sizeof(base_encode));
+        base64_encode(value, valuelen , base_encode);
+        char *json = make_json(modem_addr, base_encode);
+        if (ssl_server_ip == NULL) {
+            sprintf(buf, HTTPS_HEADER, url,  HTTPS_IP_ADDR, HTTPS_PORT_NUM, json);
+        } else {
+            sprintf(buf, HTTPS_HEADER, url,  ssl_server_ip, HTTPS_PORT_NUM, json);
+        }
+    } else {
+        if (ssl_server_ip == NULL) {
+            sprintf(buf, HTTPS_HEADER, url,  HTTPS_IP_ADDR, HTTPS_PORT_NUM, "");
+        } else {
+            sprintf(buf, HTTPS_HEADER, url,  ssl_server_ip, HTTPS_PORT_NUM, "");
+        }
+    }
+
+    message->message_txt = buf;
+    message->addr = modem_addr; //모뎀 어드레스
+    message_queue_write(&https_queue, message);
+}
+
+
+
+void loadPacketNumber()
+{
+    FILE *fp = NULL;
+    
+    fp = fopen( "gateway.pn", "r" );
+    if( fp == NULL )
+    {
+        LOG_DEBUG("packet number file not found!");
+
+        for(int i = 0; i < MAX_DEVICES; i++) {
+            packetnumberArray[i] = 0;
+        }
+        gatewayPacketNumber = 0;
+    }
+    else
+    {
+        while( !feof( fp ) )
+        {
+            for(int i = 0; i < MAX_DEVICES; i++) {
+                fscanf( fp, "%d\n", &packetnumberArray[i]);
+            }
+            fscanf( fp, "%d\n", &gatewayPacketNumber);
+        }
+        fclose( fp );
+    }
+}
+
+void savePacketNumber()
+{
+    FILE *fp = fopen("gateway.pn", "w");
+    for(int i = 0; i < MAX_DEVICES; i ++) {
+        fprintf(fp, "%d\n", packetnumberArray[i]);
+    }
+    fprintf(fp, "%d\n", gatewayPacketNumber);
+    fclose(fp);
+
+}
+
 static void sig_handler(int signal) {
     LOG_DEBUG("End of GateWay Daemon!\n");
+    savePacketNumber();
+    LOG_DEBUG("Save PacketNumber End!\n");
     threads_destroy();
     exit(0);
 }
 
-
 int main(int argc, char *argv[]) {
 
     signal(SIGINT, (void *)sig_handler);
+
+    
 
     if ( argc == 2 ) {
         ssl_server_ip = malloc(16);
@@ -769,6 +846,8 @@ int main(int argc, char *argv[]) {
         memcpy(ssl_server_ip, argv[1], strlen(argv[1]));
         LOG_DEBUG("SSL Server IP : %s", ssl_server_ip);
     }
+
+    loadPacketNumber();
 
     #if 0
     short crc = crc16("123456789", 9);
@@ -884,38 +963,3 @@ int main(int argc, char *argv[]) {
     }
 }
 
-/*
-url , 전달 데이터를 주면 서버에 
-SSL request JSON을 포함해서 전송 한다.
-value 가 없을 경우 데이터 없이 전송 한다.
-*/
-void SSLServerSend(char *url, char *value, int valuelen, int modem_addr) {
-
-    unsigned char * buf;
-    unsigned char base_encode[MAX_HTTPS_PACKET_BUFFER];
-
-    struct gateway_op *message = message_queue_message_alloc_blocking(&https_queue);
-    message->operation = OP_WRITE_HTTP;
-    buf = malloc(MAX_HTTPS_PACKET_BUFFER);
-
-    if (value != NULL) {
-        memset(base_encode, 0x00, sizeof(base_encode));
-        base64_encode(value, valuelen , base_encode);
-        char *json = make_json(modem_addr, base_encode);
-        if (ssl_server_ip == NULL) {
-            sprintf(buf, HTTPS_HEADER, url,  HTTPS_IP_ADDR, HTTPS_PORT_NUM, json);
-        } else {
-            sprintf(buf, HTTPS_HEADER, url,  ssl_server_ip, HTTPS_PORT_NUM, json);
-        }
-    } else {
-        if (ssl_server_ip == NULL) {
-            sprintf(buf, HTTPS_HEADER, url,  HTTPS_IP_ADDR, HTTPS_PORT_NUM, "");
-        } else {
-            sprintf(buf, HTTPS_HEADER, url,  ssl_server_ip, HTTPS_PORT_NUM, "");
-        }
-    }
-
-    message->message_txt = buf;
-    message->addr = modem_addr; //모뎀 어드레스
-    message_queue_write(&https_queue, message);
-}

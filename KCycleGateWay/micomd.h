@@ -299,5 +299,8 @@ extern unsigned char Key[CRL_AES192_KEY];
 extern list devices[MAX_DEVICES]; // 페어링 정보를 여기에 넣는다.
 extern int devices_count;
 extern MANUAL_PARING_STATUS_TYPE manaual_parinig_status;
+
+extern int packetnumberArray[MAX_DEVICES];
+extern int gatewayPacketNumber;
 #endif /* _MICOM_H_ */
 

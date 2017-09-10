@@ -74,8 +74,9 @@ MANUAL_PARING_STATUS_TYPE manaual_parinig_status = _MANUAL_PARING_NONE;
 list devices[MAX_DEVICES];
 int devices_count = 0; //디바이스 수
 
-// 2개
+// 디바이스 별 패킷넘버 //파일에서 로드 하고 종료할때 저장 해야 한다. 
 int packetnumberArray[MAX_DEVICES] = {0,};
+int gatewayPacketNumber = 0;
 // Key reset 되면 0
 
 
@@ -818,9 +819,7 @@ int packet_process(unsigned char * inputpacket, int addr)
         if (pn < packetnumberArray[addr]) {
             LOG_DEBUG("Packet number Error!");
             return -1;
-        } else {
-            packetnumberArray[addr] ++;
-        }
+        } 
 #endif
         // 게이트웨이  retry count 초기화
         if(code != PACKET_CMD_RETRY) {
@@ -1079,7 +1078,7 @@ void make_packet(char code,
     unsigned char ac[10];
     unsigned char enc_out[1000];
 
-    int pn = packetnumberArray[addr];
+    int pn = gatewayPacketNumber ++;
 
     memset(enc_out, 0x00, sizeof(enc_out));
     
