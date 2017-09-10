@@ -67,7 +67,6 @@ static int uart_fd = 0;
 
 char * ssl_server_ip = NULL;
 
-
 static void *uart_write_threadproc(void *dummy) {
     LOG_DEBUG("uart_write_threadproc start\n");
     while (1) {
@@ -332,8 +331,9 @@ static void http_write( char *msg, int fd, int modem_addr) {
 
         jason_str = strstr(outmsg, "\r\n\r\n") + 4;
         jason_str = strstr(jason_str, "\r\n") + 2;
-        if (jason_str > outmsg + outmsglen) {
-            LOG_DEBUG("http response JSON string error !!");
+
+        if ( strncmp(outmsg, "HTTP/1.1 200", strlen("HTTP/1.1 200") ) ) {
+            LOG_DEBUG("http response ERROR !!");
             return; 
         }
 
@@ -398,39 +398,31 @@ PairingInfo : [
             int drate;
             int count;
             char decode_grp_id[10] = {0,};
-            char encode_grp_id[10] = {0,};
-            char buf[4] = {0x69, 0xcf, 0x38, 0x00};
-            base64_encode(buf, 3, encode_grp_id);
-            LOG_DEBUG("base 64 :%s ", encode_grp_id);
-            
+
             json_t *pairinginfo;
             root = json_loads(jason_str, 0, &error);
             
-            json_unpack(root, "{s:s, s:i, s:i, s:i, s:i, s:[s:s, s:i] }", 
-                "GRP_ID", &grp_id, 
-                "CHN", &chn, 
-                "BAND", &band, 
-                "DRATE", &drate, 
-                "COUNT", &count, 
-                "PairingInfo", &pairinginfo
+            json_unpack(root, "{s:s, s:i, s:i, s:i, s:i }", 
+            "GRP_ID", &grp_id, 
+            "CHN", &chn, 
+            "BAND", &band, 
+            "DRATE", &drate, 
+            "COUNT", &count 
             );
-
+    
             LOG_DEBUG("GRP_ID : %s  :  %d", grp_id, strlen(grp_id));
-
-            
-
- 
-
-            base64_decode("acOPOA==", 8 , decode_grp_id);
 
             LOG_DEBUG("GRP_ID : %02x %02x %02x", decode_grp_id[0], decode_grp_id[1], decode_grp_id[2]);
             LOG_DEBUG("CHN : %d", chn);
             LOG_DEBUG("BAND : %d", band);
             LOG_DEBUG("DRATE : %d", drate);
+            LOG_DEBUG("COUNT : %d", count);
 
             //AT command parameter update
             // sprintf(cmd_buffer[_AT_GRP_ID], AT_GRP_ID_FMT, decode_grp_id[0], decode_grp_id[1], decode_grp_id[2]);
-            sprintf(cmd_buffer[_AT_GRP_ID], AT_GRP_ID_FMT, 0x69, 0xcf, 0x38);
+            sprintf(cmd_buffer[_AT_GRP_ID], AT_GRP_ID_FMT, 0x6f, 0xff, 0xc4); // ip 19
+            //sprintf(cmd_buffer[_AT_GRP_ID], AT_GRP_ID_FMT, 0x69, 0xcf, 0x38); // ip 21
+
             sprintf(cmd_buffer[_AT_CHN], AT_CHN_FMT, chn);
             sprintf(cmd_buffer[_AT_FBND], AT_FBAND_FMT, band);
             sprintf(cmd_buffer[_AT_DRATE], AT_DRATE_FMT, drate);
@@ -447,6 +439,29 @@ PairingInfo : [
 
             LOG_DEBUG("total pairing devices count : %d\n", count);
             devices_count = count;
+
+//하드 코딩
+#if 1
+devices_count = 3;
+devices[0].dev_id[0] = 0x60;
+devices[0].dev_id[1] = 0x00;
+devices[0].dev_id[2] = 0x04;
+devices[0].dev_addr  = 2;
+
+devices[1].dev_id[0] = 0x60;
+devices[1].dev_id[1] = 0x00;
+devices[1].dev_id[2] = 0x05;
+devices[1].dev_addr  = 3;
+
+devices[2].dev_id[0] = 0x60;
+devices[2].dev_id[1] = 0x00;
+devices[2].dev_id[2] = 0x06;
+devices[2].dev_addr  = 4;
+#endif
+
+            pairinginfo = json_object_get(root, "PairingInfo");
+
+            LOG_DEBUG("COUNT : %d", json_array_size(pairinginfo));
 
             for (int i = 0; i < json_array_size(pairinginfo); i++)
             {
@@ -471,7 +486,7 @@ PairingInfo : [
                 base64_decode(dev_id_str, strlen(dev_id_str) , decode_dev_id);
 
                 dev_addr = json_object_get(data, "DEV_ADDR");
-                if(!json_is_string(dev_addr))
+                if(!json_is_integer(dev_addr))
                 {
                     LOG_DEBUG("error: DEV_ADDR %d: DEV_ADDR is not a integer\n", (int)(i + 1));
                 }
@@ -854,15 +869,115 @@ static void sig_handler(int signal) {
     exit(0);
 }
 
+//
+#define JSONSTR "{\"GRP_ID\":\"ac84AA==\", \"CHN\":5, \"BAND\":3, \"DRATE\":2, \"COUNT\":2, \"PairingInfo\":[{\"DEV_ADDR\":5,\"DEV_ID\":\"ac84AA==\"}, {\"DEV_ADDR\":5,\"DEV_ID\":\"ac84AA==\"}, {\"DEV_ADDR\":2,\"DEV_ID\":\"ac84AA==\"}]}"
+
+void jsonTest()
+{
+    json_t *root;
+    json_error_t error;
+    char  *grp_id;
+    int chn;
+    int band;
+    int drate;
+    int count;
+    char decode_grp_id[10] = {0,};
+    
+    json_t *pairinginfo = NULL;
+
+    LOG_DEBUG("%s", JSONSTR);
+
+    root = json_loads(JSONSTR, 0, &error);
+    
+    json_unpack(root, "{s:s, s:i, s:i, s:i, s:i }", 
+        "GRP_ID", &grp_id, 
+        "CHN", &chn, 
+        "BAND", &band, 
+        "DRATE", &drate, 
+        "COUNT", &count 
+    );
+
+    LOG_DEBUG("GRP_ID : %s  :  %d", grp_id, strlen(grp_id));
+
+    base64_decode(grp_id, strlen(grp_id) , decode_grp_id);
+
+    LOG_DEBUG("GRP_ID : %02x %02x %02x", decode_grp_id[0], decode_grp_id[1], decode_grp_id[2]);
+    LOG_DEBUG("CHN : %d", chn);
+    LOG_DEBUG("BAND : %d", band);
+    LOG_DEBUG("DRATE : %d", drate);
+    LOG_DEBUG("COUNT : %d", count);
+
+    pairinginfo = json_object_get(root, "PairingInfo");
+
+    LOG_DEBUG("COUNT : %d", json_array_size(pairinginfo));
+    for (int i = 0; i < json_array_size(pairinginfo); i++)
+    {
+        json_t *data, *dev_id, *dev_addr;
+        const char * dev_id_str;
+        int dev_addr_val;
+        char decode_dev_id[10] = {0,};
+        data = json_array_get(pairinginfo, i);
+        if(!json_is_object(data))
+        {
+            LOG_DEBUG("error: commit data %d is not an object\n", (int)(i + 1));
+            json_decref(root);
+        }
+
+        dev_id = json_object_get(data, "DEV_ID");
+        if(!json_is_string(dev_id))
+        {
+            LOG_DEBUG("error: DEV_ID %d: DEV_ID is not a string\n", (int)(i + 1));
+        }
+        dev_id_str = json_string_value(dev_id);
+        memset(decode_dev_id, 0x00, sizeof(decode_dev_id));
+        base64_decode(dev_id_str, strlen(dev_id_str) , decode_dev_id);
+
+        dev_addr = json_object_get(data, "DEV_ADDR");
+        if(!json_is_integer(dev_addr))
+        {
+            LOG_DEBUG("error: DEV_ADDR %d: DEV_ADDR is not a integer\n", (int)(i + 1));
+        }
+        dev_addr_val = json_integer_value(dev_addr);
+        
+        devices[i].dev_id[0] = decode_dev_id[0];
+        devices[i].dev_id[1] = decode_dev_id[1];
+        devices[i].dev_id[2] = decode_dev_id[2];
+        devices[i].dev_addr  = dev_addr_val;
+
+        LOG_DEBUG("devices[%d] dev_id[%02x, %02x, %02x, dev_addr: %d"
+        ,i,
+        devices[i].dev_id[0],
+        devices[i].dev_id[1],
+        devices[i].dev_id[2],
+        devices[i].dev_addr );
+    }
+}
+
+
 int main(int argc, char *argv[]) {
 
+#if 0
+    jsonTest();
+    return 0;
+#endif
 
-    // char encode_grp_id[10] = {0,};
-    // char buf[4] = {0x69, 0xcf, 0x38, 0x00};
-    // base64_encode(buf, 3, encode_grp_id);
-    // LOG_DEBUG("base 64 :%s ", encode_grp_id);
+#if 0
+    unsigned char base_encode[MAX_PACKET_BUFFER];
+    unsigned char base_decode[MAX_PACKET_BUFFER];
+    memset(base_encode, 0x00, sizeof(base_encode));
+    memset(base_decode, 0x00, sizeof(base_decode));
+    char buf[4] = {0x69, 0xcf, 0x38, 0x00};
+    base64_encode(buf, 4, base_encode);
+    LOG_DEBUG("base 64 : %s   %d ", base_encode, strlen(base_encode));
 
-    // return 0;
+    base64_decode("ac84AA==", 8,  base_decode);
+    LOG_DEBUG("%02x %02x %02x %02x : %s", base_decode[0],base_decode[1],base_decode[2],base_decode[3], base_decode);
+
+    base64_decode("acOPOA==", 8,  base_decode);
+    LOG_DEBUG("%02x %02x %02x %02x : %s", base_decode[0],base_decode[1],base_decode[2],base_decode[3], base_decode);
+
+    return 0;
+#endif
 
     signal(SIGINT, (void *)sig_handler);
 
