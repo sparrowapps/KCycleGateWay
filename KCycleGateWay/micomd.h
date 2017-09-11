@@ -132,7 +132,7 @@ Content-Type: application/json\n\
 #define AT_FBAND_FMT    "AT+FBND=%d\r\n"
 #define AT_CHN_FMT      "AT+CHN=%d\r\n"
 #define AT_DRATE_FMT    "AT+DRATE=%d\r\n"
-#define AT_REG_ID_FMT   "AT+REG_#ID=%d, %02X %02X %02X\r\n"
+#define AT_REG_ID_FMT   "AT+REG_#ID=%d,%02X %02X %02X\r\n"
 
 typedef enum AT_CMD {               
     _AT_START    = 0,       
@@ -302,5 +302,6 @@ extern MANUAL_PAIRING_STATUS_TYPE manaual_pairinig_status;
 
 extern int packetnumberArray[MAX_DEVICES];
 extern int gatewayPacketNumber;
+extern int device_idx;
 #endif /* _MICOM_H_ */
 

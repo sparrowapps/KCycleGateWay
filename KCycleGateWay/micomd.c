@@ -666,7 +666,7 @@ int check_uart (PBYTE data_buf)
             case _AT_DRATE:
             case _AT_REG_ID:
                 if (manaual_pairinig_status == _MANUAL_PAIRING_STATUS) {
-                    
+                    LOG_DEBUG("device_idx : %d, %d", device_idx,devices_count);
                     cmd_id = _AT_REG_ID;
                     // 디바이스 리스트 를 엎어야 한다.
                     sprintf(cmd_buffer[_AT_REG_ID], AT_REG_ID_FMT, devices[device_idx].dev_addr, 
@@ -675,6 +675,7 @@ int check_uart (PBYTE data_buf)
                         devices[device_idx].dev_id[2]);
                         device_idx ++;
                         if (device_idx > devices_count) {
+                            LOG_DEBUG("device_idx : %d, %d", device_idx,devices_count);
                             cmd_id = _AT_RST;
                             rst_status = _RESET_STATUS;
                             data_status = _DATA_RF_MODE;
