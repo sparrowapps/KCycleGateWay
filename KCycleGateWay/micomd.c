@@ -963,6 +963,7 @@ int packet_process(unsigned char * inputpacket, int addr)
             ipc_send_flag = 1;
 
             // 버퍼링이 끝나면 서버로 전송을 하고 끝
+            // 디바이스 별로 버퍼링 해야 함
             static char race_res_buf[MAX_HTTPS_PACKET_BUFFER];
             static int offset;
             if (subcode == 0x00) {
