@@ -971,7 +971,7 @@ int packet_process(unsigned char * inputpacket, int addr)
                 
                 memcpy (race_res_buf, valuebuf, len);
                 offset += len;
-            } else if (subcode > 0x80) {
+            } else if (subcode >= 0x80) {
                 //last packet
                 memcpy(race_res_buf + offset, valuebuf, len);
                 offset += len;
