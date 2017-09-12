@@ -563,7 +563,14 @@ devices[2].dev_addr  = 4;
 
                 int addr = getAddrFromDevices(base_decode);
 
-                for (int i=0; i< devices_count; i++ ) {
+                racer_count = 0; //전체 경기 선수 초기화
+                for (int i = 0; i < MAX_RACERS; i ++ ){
+                    racer_idx[i] = -1;
+                    race_res_offset[i] = 0;
+                    memset(race_res_buf[i], 0x00, MAX_HTTPS_PACKET_BUFFER);
+                }
+
+                for (int i=0; i< devices_count; i++ ) { //to-do 경기 참여 리스트를 받아야 함
                     //여기서 집접 모든 디바이스에 브로드 케스트 전송
                     addr = devices[i].dev_addr;
 

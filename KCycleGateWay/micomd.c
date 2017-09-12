@@ -87,6 +87,14 @@ int retryCountGateway[MAX_DEVICES] = {0,}; // 게이트웨이가 재전송 횟�
 unsigned char last_packet_buffer[MAX_DEVICES][MAX_PACKET_BUFFER]; //마지막 만든 패킷 
 int last_packet_len[MAX_DEVICES] = {0,};
 
+
+//레이스 결과 버퍼링 
+char race_res_buf[MAX_RACERS][MAX_HTTPS_PACKET_BUFFER];
+int race_res_offset[MAX_RACERS]; //버퍼링 오프셋
+int racer_idx[MAX_RACERS]; //addr로 레이서 index를 기롥
+int racer_count; //race 결과 subcode = 0x00 일때 addr이 들어오는 수만큼 추가
+
+
 /* Key to be used for AES encryption/decryption */
 unsigned char Key[CRL_AES192_KEY] =
 {
@@ -964,26 +972,29 @@ int packet_process(unsigned char * inputpacket, int addr)
 
             // 버퍼링이 끝나면 서버로 전송을 하고 끝
             // 디바이스 별로 버퍼링 해야 함
-            static char race_res_buf[MAX_HTTPS_PACKET_BUFFER];
-            static int offset;
             if (subcode == 0x00) {
-                LOG_DEBUG("START buffering\n");
-                memset (race_res_buf, 0x00, MAX_HTTPS_PACKET_BUFFER);
+                putRacer(addr);
+                int idx = getRacerIndex(addr);
+
+                LOG_DEBUG("START buffering ADDR %d\n",addr);
+                memcpy (race_res_buf[idx], valuebuf, RACE_RESULT_PACKET_SIZE);
                 
-                memcpy (race_res_buf, valuebuf, len);
-                offset += len;
             } else if (subcode >= 0x80) {
                 //last packet
-                memcpy(race_res_buf + offset, valuebuf, len);
-                offset += len;
-                LOG_DEBUG("END buffering %02x offset : %d\n" , subcode, offset);
-                LOG_DEBUG("SSLServer /gateway/raceCycleResult\n" , subcode, offset);
-                SSLServerSend("/gateway/raceCycleResult", race_res_buf, offset, addr);
+                int idx = getRacerIndex(addr);
+
+                memcpy(race_res_buf + race_res_offset[idx], valuebuf, len);
+                race_res_offset[idx] = race_res_offset[idx] + len; 
+                LOG_DEBUG("END buffering %02x total size : %d\n" , subcode, race_res_offset[idx]);
+                LOG_DEBUG("SSLServer /gateway/raceCycleResult\n");
+                SSLServerSend("/gateway/raceCycleResult", race_res_buf, race_res_offset[idx], addr);
             } else {
                 //버퍼링
-                LOG_DEBUG("Buffering %02x offset : %d\n" , subcode, offset);
-                memcpy(race_res_buf + offset, valuebuf, len);
-                offset += len;
+                int idx = getRacerIndex(addr);
+
+                LOG_DEBUG("Buffering subcode:%02x offset : %d\n" , subcode, race_res_offset[idx]);
+                memcpy(race_res_buf + race_res_offset[idx], valuebuf, RACE_RESULT_PACKET_SIZE);
+                race_res_offset[idx] = (subcode + 1) * RACE_RESULT_PACKET_SIZE;    
             }
             break;
                 
@@ -1263,6 +1274,29 @@ int parse_data (PBYTE data_buf, int *cnt)
                 return 0;
         }
     }
+}
+
+//출전 경기 선수 addr 등록 중복되지 않는다면 racer_count 증가
+void putRacer(int addr)
+{
+    for (int i=0; i<MAX_RACERS; i++) {
+        if (racer_idx[i] == addr )
+            return;
+    }
+    racer_idx[racer_count] = addr;
+    racer_count ++;
+
+}
+
+//addr로 버퍼링 인덱스를 얻는다.
+int getRacerIndex(int addr)
+{
+    for (int i = 0; i < MAX_RACERS; i++) {
+        if (racer_idx[i] == addr ) {
+            return i;
+        }
+    }
+    return -1;
 }
 
 

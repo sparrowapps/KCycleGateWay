@@ -50,6 +50,8 @@ typedef signed long int        INT32;
 #define MAX_CMD                20
 
 #define MAX_HTTPS_PACKET_BUFFER 8192
+#define MAX_RACERS              9 //경기당 최대 선수
+#define RACE_RESULT_PACKET_SIZE (4*35)
 
 #define HTTP_MSG_WHATISMYJOB    "GET /gateway/whatismyjob?jobno=%s HTTP/1.1\n\
 Host: %s:%s\n\
@@ -285,6 +287,9 @@ int getAddrFromDevices(char * dev_id);
 char * getDevIDFromDevices(int dev_addr);
 void make_date_data(char * outtime_val);
 
+void putRacer(int addr);
+int getRacerIndex(int addr);
+
 //micomd extern global variable
 extern int cnt_fd_socket;
 extern int list_end;
@@ -303,5 +308,10 @@ extern MANUAL_PAIRING_STATUS_TYPE manaual_pairinig_status;
 extern int packetnumberArray[MAX_DEVICES];
 extern int gatewayPacketNumber;
 extern int device_idx;
+
+extern char race_res_buf[MAX_RACERS][MAX_HTTPS_PACKET_BUFFER];
+extern int race_res_offset[MAX_RACERS]; //버퍼링 오프셋
+extern int racer_idx[MAX_RACERS]; //addr로 레이서 index를 기롥
+extern int racer_count;
 #endif /* _MICOM_H_ */
 
