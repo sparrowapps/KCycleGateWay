@@ -992,10 +992,11 @@ int packet_process(unsigned char * inputpacket, int addr)
             } else {
                 //버퍼링
                 int idx = getRacerIndex(addr);
+                race_res_offset[idx] = (subcode) * RACE_RESULT_PACKET_SIZE;    
 
                 LOG_DEBUG("Buffering subcode:%02x offset : %d\n" , subcode, race_res_offset[idx]);
                 memcpy(race_res_buf + race_res_offset[idx], valuebuf, RACE_RESULT_PACKET_SIZE);
-                race_res_offset[idx] = (subcode + 1) * RACE_RESULT_PACKET_SIZE;    
+                
             }
             usleep(1000 * 100);
             break;
