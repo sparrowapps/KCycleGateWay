@@ -969,6 +969,7 @@ int packet_process(unsigned char * inputpacket, int addr)
             base64_encode(outpacket, outpacketlen , base_encode);
             sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", addr, base_encode);    
             ipc_send_flag = 1;
+            
 
             // 버퍼링이 끝나면 서버로 전송을 하고 끝
             // 디바이스 별로 버퍼링 해야 함
@@ -996,6 +997,7 @@ int packet_process(unsigned char * inputpacket, int addr)
                 memcpy(race_res_buf + race_res_offset[idx], valuebuf, RACE_RESULT_PACKET_SIZE);
                 race_res_offset[idx] = (subcode + 1) * RACE_RESULT_PACKET_SIZE;    
             }
+            usleep(1000 * 100);
             break;
                 
             default:
