@@ -984,18 +984,18 @@ int packet_process(unsigned char * inputpacket, int addr)
                 //last packet
                 int idx = getRacerIndex(addr);
 
-                memcpy(race_res_buf + race_res_offset[idx], valuebuf, len);
+                memcpy(race_res_buf[idx] + race_res_offset[idx], valuebuf, len);
                 race_res_offset[idx] = race_res_offset[idx] + len; 
                 LOG_DEBUG("END buffering %02x total size : %d\n" , subcode, race_res_offset[idx]);
                 LOG_DEBUG("SSLServer /gateway/raceCycleResult\n");
-                SSLServerSend("/gateway/raceCycleResult", race_res_buf, race_res_offset[idx], addr);
+                SSLServerSend("/gateway/raceCycleResult", race_res_buf[idx], race_res_offset[idx], addr);
             } else {
                 //버퍼링
                 int idx = getRacerIndex(addr);
                 race_res_offset[idx] = (subcode) * RACE_RESULT_PACKET_SIZE;    
 
                 LOG_DEBUG("Buffering subcode:%02x offset : %d\n" , subcode, race_res_offset[idx]);
-                memcpy(race_res_buf + race_res_offset[idx], valuebuf, RACE_RESULT_PACKET_SIZE);
+                memcpy(race_res_buf[idx] + race_res_offset[idx], valuebuf, RACE_RESULT_PACKET_SIZE);
                 
             }
             usleep(1000 * 100);
