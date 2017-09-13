@@ -813,15 +813,15 @@ void SSLServerSend(char *url, char *value, int valuelen, int modem_addr) {
         base64_encode(value, valuelen , base_encode);
         char *json = make_json(modem_addr, base_encode);
         if (ssl_server_ip == NULL) {
-            sprintf(buf, HTTPS_HEADER, url,  HTTPS_IP_ADDR, HTTPS_PORT_NUM, json);
+            sprintf(buf, HTTPS_HEADER, url,  HTTPS_IP_ADDR, HTTPS_PORT_NUM, strlen(json), json);
         } else {
-            sprintf(buf, HTTPS_HEADER, url,  ssl_server_ip, HTTPS_PORT_NUM, json);
+            sprintf(buf, HTTPS_HEADER, url,  ssl_server_ip, HTTPS_PORT_NUM, strlen(json), json);
         }
     } else {
         if (ssl_server_ip == NULL) {
-            sprintf(buf, HTTPS_HEADER, url,  HTTPS_IP_ADDR, HTTPS_PORT_NUM, "");
+            sprintf(buf, HTTPS_HEADER, url,  HTTPS_IP_ADDR, HTTPS_PORT_NUM, 0, "");
         } else {
-            sprintf(buf, HTTPS_HEADER, url,  ssl_server_ip, HTTPS_PORT_NUM, "");
+            sprintf(buf, HTTPS_HEADER, url,  ssl_server_ip, HTTPS_PORT_NUM, 0, "");
         }
     }
 
