@@ -225,7 +225,7 @@ int ssl_write(unsigned char * msg, unsigned char ** outmsg, int * outmsglen) {
     }
 
     SSL_write(sslOpenToServer.ssl, msg, strlen(msg));
-    LOG_DEBUG("\n https request %d bytes\n", bytes);
+    LOG_DEBUG("\n https request %d bytes\n", strlen(msg));
     BIO_dump_fp(stdout, msg, strlen(msg));
 
     buf = malloc(MAX_HTTPS_PACKET_BUFFER);
@@ -987,9 +987,9 @@ int packet_process(unsigned char * inputpacket, int addr)
 
                 memcpy(race_res_buf[idx] + race_res_offset[idx], valuebuf, len);
                 race_res_offset[idx] = race_res_offset[idx] + len; 
-                LOG_DEBUG("END buffering %02x total size : %d\n" , subcode, race_res_offset[idx] + len);
+                LOG_DEBUG("END buffering %02x total size : %d\n" , subcode, race_res_offset[idx] );
                 LOG_DEBUG("SSLServer /gateway/raceCycleResult\n");
-                SSLServerSend("/gateway/raceCycleResult", race_res_buf[idx], race_res_offset[idx] + len, addr);
+                SSLServerSend("/gateway/raceCycleResult", race_res_buf[idx], race_res_offset[idx], addr);
             } else {
                 //버퍼링
                 int idx = getRacerIndex(addr);
