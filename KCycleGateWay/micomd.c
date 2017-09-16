@@ -983,13 +983,15 @@ int packet_process(unsigned char * inputpacket, int addr)
             } else if (subcode >= 0x80) {
                 //last packet
                 int idx = getRacerIndex(addr);
-                race_res_offset[idx] = (subcode - 0x80) * RACE_RESULT_PACKET_SIZE;
-
-                memcpy(race_res_buf[idx] + race_res_offset[idx], valuebuf, len);
-                race_res_offset[idx] = race_res_offset[idx] + len; 
-                LOG_DEBUG("END buffering %02x total size : %d\n" , subcode, race_res_offset[idx] );
-                LOG_DEBUG("SSLServer /gateway/raceCycleResult\n");
-                SSLServerSend("/gateway/raceCycleResult", race_res_buf[idx], race_res_offset[idx], addr);
+                if (race_res_offset[idx] != -1 ) {
+                    race_res_offset[idx] = (subcode - 0x80) * RACE_RESULT_PACKET_SIZE;
+                    memcpy(race_res_buf[idx] + race_res_offset[idx], valuebuf, len);
+                    race_res_offset[idx] = race_res_offset[idx] + len; 
+                    LOG_DEBUG("END buffering %02x total size : %d\n" , subcode, race_res_offset[idx] );
+                    LOG_DEBUG("SSLServer /gateway/raceCycleResult\n");
+                    SSLServerSend("/gateway/raceCycleResult", race_res_buf[idx], race_res_offset[idx], addr);
+                    race_res_offset[idx] = -1; //전송 했음
+                }
             } else {
                 //버퍼링
                 int idx = getRacerIndex(addr);
@@ -1016,6 +1018,7 @@ int packet_process(unsigned char * inputpacket, int addr)
             valuebuf[1] = 1;
             SSLServerSend("/gateway/errorCheck", valuebuf, 2, addr);
         } else {
+            usleep(1000 * 100);
             retryCountDevice[addr] ++;
 
             unsigned char outpacket[MAX_PACKET_BUFFER];

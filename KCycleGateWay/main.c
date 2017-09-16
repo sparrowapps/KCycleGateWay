@@ -566,7 +566,7 @@ devices[2].dev_addr  = 4;
                 racer_count = 0; //전체 경기 선수 초기화
                 for (int i = 0; i < MAX_RACERS; i ++ ){
                     racer_idx[i] = -1;
-                    race_res_offset[i] = 0;
+                    race_res_offset[i] = -1;
                     memset(race_res_buf[i], 0x00, MAX_HTTPS_PACKET_BUFFER);
                 }
 
