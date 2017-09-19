@@ -73,7 +73,7 @@ static void *uart_write_threadproc(void *dummy) {
         struct gateway_op *message = message_queue_read(&uart_w_queue);
 
         if ( message->operation == OP_WRITE_UART ) {
-            LOG_DEBUG("OP_WRITE_UART : %s\n ,%d",message->message_txt, message->uartfd);
+            LOG_DEBUG("OP_WRITE_UART : %s",message->message_txt);
             uart_write( uart_fd, message->message_txt );
             free((void *)message->message_txt);
             message_queue_message_free(&uart_w_queue, message);
@@ -187,7 +187,7 @@ static void threads_destroy() {
 // MARK: uart data processing
 struct socket_state {
     enum { SOCKET_INACTIVE, SOCKET_READING, SOCKET_WRITING } state;
-    char buf[1024];
+    char buf[128];
     int pos;
     // struct io_op *write_op;
 };
@@ -239,7 +239,7 @@ static void handle_socket_request(int fd, char *request) {
 // MARK: uart data processing
 struct uart_state {
     enum { UART_INACTIVE, UART_READING, UART_WRITING } state;
-    char buf[256];
+    char buf[128];
     int pos;
 };
 
@@ -251,7 +251,7 @@ struct uart_state uart_data[FD_SETSIZE];
 static void handle_uart_data(int fd) {
     int r;
     do {
-    r = read(fd, uart_data[fd].buf + uart_data[fd].pos, 256 - uart_data[fd].pos);
+    r = read(fd, uart_data[fd].buf + uart_data[fd].pos, 128 - uart_data[fd].pos);
         uart_data[fd].pos += r;
     }while( r == -1 );
 

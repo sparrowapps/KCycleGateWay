@@ -460,7 +460,9 @@ int check_rf_data(PBYTE data_buf)
                 addr = atoi(token);
                 check_addr = 1;
             }
-            else {
+            else 
+            {
+                check_addr = 0;
                 LOG_DEBUG("token = %s\n", token);
                 if(memcmp(token, PING_CHECK, strlen(PING_CHECK)) == 0)
                 {
