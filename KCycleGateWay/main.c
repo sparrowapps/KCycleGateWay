@@ -267,6 +267,7 @@ static void handle_uart_request(int fd, char *request) {
     
     if (parse_data(request , &uart_cnt) == 1) {
         LOG_DEBUG("PARSE OK : %s", request);
+        BIO_dump_fp(stdout, request, strlen(request));
 
         if (uart_cnt >0  || (cmd_state == _AT_LST_ID && list_end == 1) ) {
             if (data_status == _DATA_RF_MODE) {
