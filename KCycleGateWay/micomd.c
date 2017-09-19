@@ -92,6 +92,7 @@ int last_packet_len[MAX_DEVICES] = {0,};
 
 //레이스 결과 버퍼링 
 char race_res_buf[MAX_RACERS][MAX_HTTPS_PACKET_BUFFER];
+int busy_flag = 0;
 int race_res_offset[MAX_RACERS] = {0, }; //버퍼링 오프셋
 int racer_idx[MAX_RACERS]; //addr로 레이서 index를 기롥
 int racer_count; //race 결과 subcode = 0x00 일때 addr이 들어오는 수만큼 추가
@@ -469,15 +470,10 @@ int check_rf_data(PBYTE data_buf)
                     //버퍼링 중에는 ping 체크가 busy로 날라간다.
                     cmd_id = _AT_USER_CMD;
 
-                    for(int i = 0; i<MAX_RACERS; i++ ) {
-                        if (race_res_offset[i] > 0 ) {
-                            sprintf(cmd_buffer[cmd_id], "%d,busy\r\n", addr);
-                            LOG_DEBUG("busy....\n", token);
-                            break;
-                        } else {
-                            sprintf(cmd_buffer[cmd_id], "%d,ping\r\n", addr);
-                            LOG_DEBUG("ping....\n", token);
-                        }
+                    if (busy_flag != 0 ) {
+                        sprintf(cmd_buffer[cmd_id], "%d,busy\r\n", addr);
+                    } else {
+                        sprintf(cmd_buffer[cmd_id], "%d,ping\r\n", addr);
                     }
 
                     ipc_send_flag = 1;
@@ -996,7 +992,7 @@ int packet_process(unsigned char * inputpacket, int addr)
 
                 LOG_DEBUG("START buffering ADDR %d\n",addr);
                 memcpy (race_res_buf[idx], valuebuf, RACE_RESULT_PACKET_SIZE);
-                
+                busy_flag = 1;
             } else if (subcode >= 0x80) {
                 //last packet
                 int idx = getRacerIndex(addr);
@@ -1008,6 +1004,7 @@ int packet_process(unsigned char * inputpacket, int addr)
                     LOG_DEBUG("SSLServer /gateway/raceCycleResult\n");
                     SSLServerSend("/gateway/raceCycleResult", race_res_buf[idx], race_res_offset[idx], addr);
                     race_res_offset[idx] = -1; //전송 했음
+                    busy_flag = 0;
                 }
             } else {
                 //버퍼링
