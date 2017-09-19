@@ -467,19 +467,21 @@ int check_rf_data(PBYTE data_buf)
                 if(memcmp(token, PING_CHECK, strlen(PING_CHECK)) == 0)
                 {
                     //버퍼링 중에는 ping 체크가 busy로 날라간다.
+                    cmd_id = _AT_USER_CMD;
+
                     for(int i = 0; i<MAX_RACERS; i++ ) {
                         if (race_res_offset[i] > 0 ) {
                             sprintf(cmd_buffer[cmd_id], "%d,busy\r\n", addr);
+                            LOG_DEBUG("busy....\n", token);
                             break;
                         } else {
                             sprintf(cmd_buffer[cmd_id], "%d,ping\r\n", addr);
+                            LOG_DEBUG("ping....\n", token);
                         }
                     }
 
-                    LOG_DEBUG("token = %s\n", token);
-                    cmd_id = _AT_USER_CMD;
-                    
                     ipc_send_flag = 1;
+                    request_uart_send();
                 }
                 else
                 {
@@ -870,6 +872,7 @@ int packet_process(unsigned char * inputpacket, int addr)
                 base64_encode(last_packet_buffer[addr], last_packet_len[addr] , base_encode);
                 sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", addr, base_encode);    
                 ipc_send_flag = 1;
+                request_uart_send();
                 retryCountGateway[addr] ++;
             }
             break;
@@ -1016,6 +1019,7 @@ int packet_process(unsigned char * inputpacket, int addr)
                 
             }
             usleep(1000 * 100);
+            request_uart_send();
             break;
                 
             default:

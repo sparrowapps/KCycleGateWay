@@ -961,6 +961,21 @@ void jsonTest()
     }
 }
 
+void request_uart_send() 
+{
+    struct gateway_op *message = message_queue_message_alloc_blocking(&uart_w_queue);
+    message->operation = OP_WRITE_UART;
+
+    cmd_state = cmd_id; //이전 전송 메세지를 할당
+
+    unsigned char * buf;
+    buf = malloc(MAX_PACKET_BUFFER);
+    memcpy(buf, cmd_buffer[cmd_id], MAX_PACKET_BUFFER);
+    message->message_txt = buf;
+    message->uartfd = uart_fd;
+    message_queue_write(&uart_w_queue, message);
+    ipc_send_flag = 0;
+}
 
 int main(int argc, char *argv[]) {
 
