@@ -239,97 +239,25 @@ static void handle_socket_request(int fd, char *request) {
 // MARK: uart data processing
 struct uart_state {
     enum { UART_INACTIVE, UART_READING, UART_WRITING } state;
-    char buf[MAX_PACKET_BUFFER];
+    char buf[256];
     int pos;
 };
 
 struct uart_state uart_data[FD_SETSIZE];
 
 
-static void handle_uart_request2(int fd, char *request) {
-    int uart_cnt = uart_data[fd].pos;
-    
-    if (parse_data(request , &uart_cnt) == 1) {
-        LOG_DEBUG("PARSE OK : %s", request);
-
-        if (uart_cnt >0  || (cmd_state == _AT_LST_ID && list_end == 1) ) {
-            
-            if (data_status == _DATA_RF_MODE) {
-                check_rf_data(request);
-            } else {
-                check_uart(request);
-            }
-        }
-
-        // ipc_send_flag : 데이터 전송
-        if (ipc_send_flag == 1) {
-            struct gateway_op *message = message_queue_message_alloc_blocking(&uart_w_queue);
-            LOG_DEBUG("SEDND : %s \n", (char *)cmd_buffer[cmd_id]);
-            message->operation = OP_WRITE_UART;
-
-            cmd_state = cmd_id; //이전 전송 메세지를 할당
-            
-            unsigned char * buf;
-            buf = malloc(MAX_PACKET_BUFFER);
-            memcpy(buf, cmd_buffer[cmd_id], MAX_PACKET_BUFFER);
-            message->message_txt = buf;
-            message->uartfd = fd;
-            message_queue_write(&uart_w_queue, message);
-            ipc_send_flag = 0;
-        }
-    } else {
-        return;
-    }
-}
-
 // uart 에서 데이터를 읽는 다.
 // read_packet() 함수를 사용 하지 않는다.
 static void handle_uart_data(int fd) {
+    int r;
+    do {
+    r = read(fd, uart_data[fd].buf + uart_data[fd].pos, 256 - uart_data[fd].pos);
+        uart_data[fd].pos += r;
+    }while( r == -1 );
 
-    if (data_status == _DATA_AT_MODE) {
-        int r;
-        do {
-        r = read(fd, uart_data[fd].buf + uart_data[fd].pos, MAX_PACKET_BUFFER - uart_data[fd].pos);
-            uart_data[fd].pos += r;
-        }while( r == -1 );
+    uart_data[fd].state = UART_INACTIVE;
 
-        handle_uart_request(fd, uart_data[fd].buf);
-    } else {
-        int r;
-        int pos = 0;
-        
-again:
-
-        do {
-        r = read(fd, uart_data[fd].buf + uart_data[fd].pos, MAX_PACKET_BUFFER - uart_data[fd].pos);
-            uart_data[fd].pos += r;
-        }while( r == -1 );
-        char tempbuf[1024] = {0,};
-
-        while ( (uart_data[fd].buf + pos) < (uart_data[fd].buf + uart_data[fd].pos) ){
-            char * chkp = NULL;
-            chkp = strstr((uart_data[fd].buf + pos),"\r\n");
-            if (chkp != NULL ) {
-                if ((chkp + 2) == (uart_data[fd].buf + pos + uart_data[fd].pos) ) {
-                    //\r\n 1개 짜리 패킷 또는 마지막 패킷
-                    int datasize = (chkp + 2) - (uart_data[fd].buf + pos);
-                    memset(tempbuf, 0x00, sizeof(tempbuf));
-                    memcpy(tempbuf, uart_data[fd].buf + pos, datasize);
-                    handle_uart_request(fd, tempbuf);  
-                } else {
-                    int datasize = (chkp + 2) - (uart_data[fd].buf + pos);
-                    memset(tempbuf, 0x00, sizeof(tempbuf));
-                    memcpy(tempbuf, uart_data[fd].buf + pos, datasize);
-                    handle_uart_request2(fd, tempbuf);
-                    pos += datasize;
-                }
-            } else {
-                goto again;
-            }
-        }
-        
-
-    }
+    handle_uart_request(fd, uart_data[fd].buf);
 }
 
 static void handle_uart_request(int fd, char *request) {
@@ -341,7 +269,6 @@ static void handle_uart_request(int fd, char *request) {
         LOG_DEBUG("PARSE OK : %s", request);
 
         if (uart_cnt >0  || (cmd_state == _AT_LST_ID && list_end == 1) ) {
-            
             if (data_status == _DATA_RF_MODE) {
                 check_rf_data(request);
             } else {
@@ -352,7 +279,6 @@ static void handle_uart_request(int fd, char *request) {
         // ipc_send_flag : 데이터 전송
         if (ipc_send_flag == 1) {
             struct gateway_op *message = message_queue_message_alloc_blocking(&uart_w_queue);
-            LOG_DEBUG("SEDND : %s \n", (char *)cmd_buffer[cmd_id]);
             message->operation = OP_WRITE_UART;
 
             cmd_state = cmd_id; //이전 전송 메세지를 할당
@@ -365,7 +291,6 @@ static void handle_uart_request(int fd, char *request) {
             message_queue_write(&uart_w_queue, message);
             ipc_send_flag = 0;
         }
-
         uart_data[fd].pos = 0;
         memset(uart_data[fd].buf, 0x00, sizeof (uart_data[fd].buf));
     } else {

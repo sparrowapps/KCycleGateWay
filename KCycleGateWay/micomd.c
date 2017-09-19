@@ -67,6 +67,8 @@ int rand_channel = -1;
 PAIR_STATUS_TYPE pair_status = _UNPAIRED; // pair 유무 UNPARED 문자 확인 
 DATA_STATUS_TYPE data_status = _DATA_RF_MODE; // AT 커맨드로 데이터를 처리 할때 data_status 1
 RESET_STATUS_TYPE rst_status = _RESET_NONE;  // AT reset 처리 했을때 1
+
+
 int device_idx = 0; 
 
 MANUAL_PAIRING_STATUS_TYPE manaual_pairinig_status = _MANUAL_PAIRING_NONE;
