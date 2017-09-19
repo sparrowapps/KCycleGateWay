@@ -187,7 +187,7 @@ static void threads_destroy() {
 // MARK: uart data processing
 struct socket_state {
     enum { SOCKET_INACTIVE, SOCKET_READING, SOCKET_WRITING } state;
-    char buf[128];
+    char buf[1024];
     int pos;
     // struct io_op *write_op;
 };
@@ -239,7 +239,7 @@ static void handle_socket_request(int fd, char *request) {
 // MARK: uart data processing
 struct uart_state {
     enum { UART_INACTIVE, UART_READING, UART_WRITING } state;
-    char buf[128];
+    char buf[1024];
     int pos;
 };
 
@@ -251,7 +251,7 @@ struct uart_state uart_data[FD_SETSIZE];
 static void handle_uart_data(int fd) {
     int r;
     do {
-    r = read(fd, uart_data[fd].buf + uart_data[fd].pos, 128 - uart_data[fd].pos);
+    r = read(fd, uart_data[fd].buf + uart_data[fd].pos, 1024 - uart_data[fd].pos);
         uart_data[fd].pos += r;
     }while( r == -1 );
 
