@@ -266,7 +266,7 @@ static void handle_uart_request(int fd, char *request) {
     int uart_cnt = uart_data[fd].pos;
     
     if (parse_data(request , &uart_cnt) == 1) {
-        LOG_DEBUG("PARSE OK : %s", request);
+        LOG_DEBUG("PARSE OK :");printf("%s\n",request);
         BIO_dump_fp(stdout, request, strlen(request));
 
         if (uart_cnt >0  || (cmd_state == _AT_LST_ID && list_end == 1) ) {
