@@ -303,6 +303,46 @@ static void uart_write(int fd,  char *msg) {
     int r = write_packet(fd, msg, strlen(msg));
 }
 
+
+// JSON 문자열을 받아서 전역변수 racer_addr[] 배열을 구축 한다.
+static void make_racer_addr(char * jason_str)
+{
+    json_t *root;
+    json_error_t error;
+    json_t *devicelist;
+    root = json_loads(jason_str, 0, &error);
+    devicelist = json_object_get(root, "DeviceList");
+    racer_count = json_array_size(devicelist);
+    LOG_DEBUG("cmd raceStart : racer count %d", racer_count);
+    for (int i = 0; i < racer_count; i++)
+    {
+        json_t *data, *dev_id;
+        const char * dev_id_str;
+
+        char decode_dev_id[10] = {0,};
+        data = json_array_get(devicelist, i);
+        if(!json_is_object(data))
+        {
+            LOG_DEBUG("error: commit data %d is not an object\n", (int)(i + 1));
+            json_decref(root);
+        }
+
+        dev_id = json_object_get(data, "DEV_ID");
+        if(!json_is_string(dev_id))
+        {
+            LOG_DEBUG("error: DEV_ID %d: DEV_ID is not a string\n", (int)(i + 1));
+        }
+        dev_id_str = json_string_value(dev_id);
+        memset(decode_dev_id, 0x00, sizeof(decode_dev_id));
+        base64_decode(dev_id_str, strlen(dev_id_str) , decode_dev_id);
+        int addr = getAddrFromDevices(decode_dev_id);
+        
+        racer_addr[i] = addr; //레이스 참여 addr을 저장
+        LOG_DEBUG("cmd raceStart : idx:%d addr:%d", i, addr);
+    }
+}
+
+
 /*
     SSL write 후 응담을 uart로 쏴야 할경우 여기서 처리 해야 한다.
 */
@@ -444,25 +484,6 @@ PairingInfo : [
             devices_count = count;
             device_idx = 0;
 
-//하드 코딩
-#if 0
-devices_count = 3;
-devices[0].dev_id[0] = 0x60;
-devices[0].dev_id[1] = 0x00;
-devices[0].dev_id[2] = 0x04;
-devices[0].dev_addr  = 2;
-
-devices[1].dev_id[0] = 0x60;
-devices[1].dev_id[1] = 0x00;
-devices[1].dev_id[2] = 0x05;
-devices[1].dev_addr  = 3;
-
-devices[2].dev_id[0] = 0x60;
-devices[2].dev_id[1] = 0x00;
-devices[2].dev_id[2] = 0x06;
-devices[2].dev_addr  = 4;
-#endif
-
             pairinginfo = json_object_get(root, "PairingInfo");
 
             for (int i = 0; i < json_array_size(pairinginfo); i++)
@@ -509,60 +530,73 @@ devices[2].dev_addr  = 4;
 #endif
                 //페어링 정보 어레이를 jansson  해석을 한다음 AT+CMD로 페어링 정보를 쏴야 한다.
             } else if (!strcmp(jobname, "trainingStart")) {
-                char * value = from_json(jason_str, "DeviceID");
-                base64_decode(value, strlen(value), base_decode); //디바이스 아이디
-
-                int addr = getAddrFromDevices(base_decode);
-                char date_val[5];
-
-                make_date_data(date_val);
+                make_racer_addr(jason_str);
                 
-                make_packet(PACKET_CMD_TRAININGSTART_S, 0x00, addr, 5, date_val, outpacket, &outpacketlen);
-                base64_encode(outpacket, outpacketlen , base_encode);
-                sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", modem_addr, base_encode);
+                char date_val[5];
+                for (int i=0; i< racer_count; i++ ) {
+                    make_date_data(date_val);
+                    
+                    make_packet(PACKET_CMD_TRAININGSTART_S, 0x00, racer_addr[i], 5, date_val, outpacket, &outpacketlen);
+                    base64_encode(outpacket, outpacketlen , base_encode);
+                    sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", racer_addr[i], base_encode);
+
+                    request_uart_send();
+                }
+                is_uart_send = 0; //위에서 이미 전송 했음
 
             } else if (!strcmp(jobname, "trainingStop")) {
-                char * value = from_json(jason_str, "DeviceID");
-                base64_decode(value, strlen(value), base_decode); //디바이스 아이디
+                make_racer_addr(jason_str);
 
-                int addr = getAddrFromDevices(base_decode);
-                
-                make_packet(PACKET_CMD_TRAININGSTOP_S, 0x00, addr, 0, NULL, outpacket, &outpacketlen);
-                base64_encode(outpacket, outpacketlen , base_encode);
-                sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", modem_addr, base_encode);
+                for (int i=0; i< racer_count; i++ ) {
+                    make_packet(PACKET_CMD_TRAININGSTOP_S, 0x00, racer_addr[i], 0, NULL, outpacket, &outpacketlen);
+                    base64_encode(outpacket, outpacketlen , base_encode);
+                    sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", racer_addr[i], base_encode);
+
+                    request_uart_send();
+                }
+                is_uart_send = 0; //위에서 이미 전송 했음
                 
             } else if (!strcmp(jobname, "dashStart")) {
-                char * value = from_json(jason_str, "DeviceID");
-                base64_decode(value, strlen(value), base_decode); //디바이스 아이디
 
-                int addr = getAddrFromDevices(base_decode);
+                make_racer_addr(jason_str);
+
                 char date_val[5];
+                for (int i=0; i< racer_count; i++ ) {
+                    make_date_data(date_val);
+                    
+                    make_packet(PACKET_CMD_DASHSTART_S, 0x00, racer_addr[i], 5, date_val, outpacket, &outpacketlen);
+                    base64_encode(outpacket, outpacketlen , base_encode);
+                    sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", racer_addr[i], base_encode);
 
-                make_date_data(date_val);
-                
-                make_packet(PACKET_CMD_DASHSTART_S, 0x00, addr, 5, date_val, outpacket, &outpacketlen);
-                base64_encode(outpacket, outpacketlen , base_encode);
-                sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", modem_addr, base_encode);
+                    request_uart_send();
+
+                }
+                is_uart_send = 0; //위에서 이미 전송 했음
                 
             } else if (!strcmp(jobname, "dashStop")) {
-                char * value = from_json(jason_str, "DeviceID");
-                base64_decode(value, strlen(value), base_decode); //디바이스 아이디
-
-                int addr = getAddrFromDevices(base_decode);
-                char date_val[5];
-
-                make_date_data(date_val);
                 
-                make_packet(PACKET_CMD_DASHSTOP_S, 0x00, addr, 5, date_val, outpacket, &outpacketlen);
-                base64_encode(outpacket, outpacketlen , base_encode);
-                sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", modem_addr, base_encode);
+                make_racer_addr(jason_str);
+
+                char date_val[5];
+                for (int i=0; i< racer_count; i++ ) {
+                    make_date_data(date_val);
+                    
+                    make_packet(PACKET_CMD_DASHSTOP_S, 0x00, racer_addr[i], 5, date_val, outpacket, &outpacketlen);
+                    base64_encode(outpacket, outpacketlen , base_encode);
+                    sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", racer_addr[i], base_encode);
+
+                    request_uart_send();
+                }
+                is_uart_send = 0; //위에서 이미 전송 했음
+                
                 
             } else if (!strcmp(jobname, "raceStart")) {
-                char * value = from_json(jason_str, "DeviceID");
-                base64_decode(value, strlen(value), base_decode); //디바이스 아이디
 
-                int addr = getAddrFromDevices(base_decode);
-
+                // to do : device list 를 받음
+                make_racer_addr(jason_str);
+                
+#if 0 //아래의 기능은 건에 의해 0x3b 명령으로 트리거 된다.
+                // to do : 건에서 명령을 받아야 여기를 수행함..
                 racer_count = 0; //전체 경기 선수 초기화
                 for (int i = 0; i < MAX_RACERS; i ++ ){
                     racer_idx[i] = -1;
@@ -591,34 +625,43 @@ devices[2].dev_addr  = 4;
                     LOG_DEBUG("message_queue_write");
                 }
                 is_uart_send = 0; //위에서 이미 전송 했음
-
+#endif
             } else if (!strcmp(jobname, "raceStop")) {
-                char * value = from_json(jason_str, "DeviceID");
-                base64_decode(value, strlen(value), base_decode); //디바이스 아이디
+                
+                make_racer_addr(jason_str);
 
-                int addr = getAddrFromDevices(base_decode);
-
-                for (int i=0; i< devices_count; i++ ) {
+                for (int i=0; i< racer_count; i++ ) {
                     //여기서 집접 모든 디바이스에 브로드 케스트 전송
-                    addr = devices[i].dev_addr;
-
-                    make_packet(PACKET_CMD_RACESTOP_S, 0x00, addr, 0, NULL, outpacket, &outpacketlen);
+                    make_packet(PACKET_CMD_RACESTOP_S, 0x00, racer_addr[i], 0, NULL, outpacket, &outpacketlen);
                     base64_encode(outpacket, outpacketlen , base_encode);
-                    sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", addr, base_encode);
+                    sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", racer_addr[i], base_encode);
     
-                    struct gateway_op *message = message_queue_message_alloc_blocking(&uart_w_queue);
-                    message->operation = OP_WRITE_UART;
-
-                    unsigned char * message_txt_buf = malloc(MAX_PACKET_BUFFER);
-                    memset(message_txt_buf, 0x00 , MAX_PACKET_BUFFER);
-                    memcpy(message_txt_buf, cmd_buffer[cmd_id], MAX_PACKET_BUFFER);
-                    LOG_DEBUG("UART SEND TEXT : %s ", message_txt_buf);
-                    message->message_txt = message_txt_buf;
-                    message->uartfd = fd;
-                    message_queue_write(&uart_w_queue, message);
-                    LOG_DEBUG("message_queue_write");
+                    request_uart_send();
                 }
                 is_uart_send = 0; //위에서 이미 전송 했음
+
+            } else if (!strcmp(jobname, "raceResultReady")) {
+                
+                make_racer_addr(jason_str);
+
+                for (int i=0; i< racer_count; i++ ) {
+                    //여기서 집접 모든 디바이스에 브로드 케스트 전송
+                    make_packet(PACKET_CMD_RACERESULT_READY_S, 0x00, racer_addr[i], 0, NULL, outpacket, &outpacketlen);
+                    base64_encode(outpacket, outpacketlen , base_encode);
+                    sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", racer_addr[i], base_encode);
+    
+                    request_uart_send();
+                }
+                is_uart_send = 0; //위에서 이미 전송 했음
+
+            } else if (!strcmp(jobname, "raceResultQuery")) {
+                char * value = from_json(jason_str, "Device");
+                int device_addr = atoi(value);
+                LOG_DEBUG("cmd raceResultQuery : device_addr %d", device_addr);
+                //여기서 집접 모든 디바이스에 브로드 케스트 전송
+                make_packet(PACKET_CMD_RACERESULT_QUERY_S, 0x00, device_addr, 0, NULL, outpacket, &outpacketlen);
+                base64_encode(outpacket, outpacketlen , base_encode);
+                sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", device_addr, base_encode);
 
             } else {
                 // json 파싱 종료
@@ -641,6 +684,9 @@ devices[2].dev_addr  = 4;
             // 응답 받고 처리 할께 없음
             is_uart_send = 0;
         } else if (strcmp(res, "raceStart") == 0) { //패턴2
+            // 응답 받고 처리 할께 없음
+            is_uart_send = 0;
+        } else if (strcmp(res, "raceResultReady") == 0) { //패턴2
             // 응답 받고 처리 할께 없음
             is_uart_send = 0;
         } else if (strcmp(res, "ping") == 0) {
@@ -981,6 +1027,7 @@ void request_uart_send()
     memcpy(buf, cmd_buffer[cmd_id], MAX_PACKET_BUFFER);
     message->message_txt = buf;
     message->uartfd = uart_fd;
+    LOG_DEBUG("UART SEND TEXT : %s ", buf);
     message_queue_write(&uart_w_queue, message);
     ipc_send_flag = 0;
 }

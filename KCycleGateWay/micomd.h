@@ -184,7 +184,8 @@ typedef struct list_id {
     BYTE dev_id[3];
 } list;
 
-
+// suffix _R receive (디바이스로 부터 받는다.)
+// suffix _S send    (게이트 웨이가 전송)
 #define PACKET_CMD_PING_R           0x01
 #define PACKET_CMD_PING_S           0x02
 
@@ -233,6 +234,17 @@ typedef struct list_id {
 // 임시커맨드
 #define PACKET_CMD_RACESTOP_S      0x39
 #define PACKET_CMD_RACESTOP_R      0x3A
+
+// GUN에서 출발 명령을 받으면 디바이스에게 PACKET_CMD_RACESTART_S 전송 하는 기능을 수행 한다.
+#define PACKET_CMD_RACESTART_GUN_R 0x3B
+#define PACKET_CMD_RACESTART_GUN_S 0x3D
+
+#define PACKET_CMD_RACERESULT_READY_S      0x3E
+#define PACKET_CMD_RACERESULT_READY_R      0x3F
+
+#define PACKET_CMD_RACERESULT_QUERY_S      0x40 //결과 전송 요청
+#define PACKET_CMD_RACERESULT_QUERY_R      0x41
+
 
 #define PACKET_CMD_RETRY           0xFF // 재전송 요구 및 재전송 패킷
 
@@ -313,5 +325,6 @@ extern char race_res_buf[MAX_RACERS][MAX_HTTPS_PACKET_BUFFER];
 extern int race_res_offset[MAX_RACERS]; //버퍼링 오프셋
 extern int racer_idx[MAX_RACERS]; //addr로 레이서 index를 기롥
 extern int racer_count;
+extern int racer_addr[MAX_RACERS];
 #endif /* _MICOM_H_ */
 

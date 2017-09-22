@@ -95,6 +95,9 @@ char race_res_buf[MAX_RACERS][MAX_HTTPS_PACKET_BUFFER];
 int busy_flag = 0;
 int race_res_offset[MAX_RACERS] = {0, }; //버퍼링 오프셋
 int racer_idx[MAX_RACERS]; //addr로 레이서 index를 기롥
+
+int racer_addr[MAX_RACERS]; //레이스 시작 스탑 등에 디바이스 addr보관
+
 int racer_count; //race 결과 subcode = 0x00 일때 addr이 들어오는 수만큼 추가
 
 
@@ -827,7 +830,7 @@ int packet_process(unsigned char * inputpacket, int addr)
     unsigned char  valuebuf[MAX_PACKET_BYTE];
     
     memset(valuebuf, 0x00, MAX_PACKET_BYTE);
-    
+    unsigned char outpacket[MAX_PACKET_BUFFER];
     int outpacketlen = 0;
 
     unsigned char base_encode[MAX_PACKET_BUFFER];
@@ -959,6 +962,12 @@ int packet_process(unsigned char * inputpacket, int addr)
             SSLServerSend("/gateway/raceStop", valuebuf, len, addr);
             break;
 
+            case PACKET_CMD_RACERESULT_READY_R: //패턴2
+            LOG_DEBUG("cmd PACKET_CMD_RACERESULT_READY_R");
+        
+            SSLServerSend("/gateway/raceResultReady", valuebuf, len, addr);
+            break;
+
             case PACKET_CMD_RACELINERESULT_R:
             LOG_DEBUG("cmd PACKET_CMD_RACELINERESULT_R : len %d", len);
             
@@ -967,14 +976,53 @@ int packet_process(unsigned char * inputpacket, int addr)
             SSLServerSend("/gateway/raceLineResult", valuebuf, len, addr);
             break;
 
+            case PACKET_CMD_RACERESULT_QUERY_R:
+            //서버로 보내야 하나?? 논의 필요
+            break;
+
+            //건으로 부터 출발 신호를 받았다.
+            case PACKET_CMD_RACESTART_GUN_R: 
+            LOG_DEBUG("cmd PACKET_CMD_RACESTART_GUN_R : racer count %d", racer_count);
+            for (int i = 0; i < racer_count; i ++ ){
+                racer_idx[i] = -1;
+                race_res_offset[i] = -1;
+                memset(race_res_buf[i], 0x00, MAX_HTTPS_PACKET_BUFFER);
+            }
+
+            for (int i = 0; i< racer_count; i++ ) { // 경기 참여 디바이스에 RACE sTART 전송
+                memset(outpacket, 0x00, sizeof(outpacket));
+                memset(base_encode, 0x00, sizeof(base_encode));
+                outpacketlen = 0;
+
+                make_packet(PACKET_CMD_RACESTART_S, 0x00, racer_addr[i], 0, NULL, outpacket, &outpacketlen);
+                base64_encode(outpacket, outpacketlen , base_encode);
+                sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", racer_addr[i], base_encode);
+                LOG_DEBUG("cmd PACKET_CMD_RACESTART_GUN_R : cmdbuffer : %s", cmd_buffer[_AT_USER_CMD]);
+                ipc_send_flag = 1;
+                request_uart_send();
+            }
+            //건에게 응답
+            memset(outpacket, 0x00, sizeof(outpacket));
+            memset(base_encode, 0x00, sizeof(base_encode));
+            outpacketlen = 0;
+
+            make_packet(PACKET_CMD_RACESTART_GUN_S, 0x00, addr, 0, NULL, outpacket, &outpacketlen);
+            base64_encode(outpacket, outpacketlen , base_encode);
+            sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", addr, base_encode);
+            LOG_DEBUG("cmd PACKET_CMD_RACESTART_GUN_R : cmdbuffer : %s", cmd_buffer[_AT_USER_CMD]);
+            ipc_send_flag = 1;
+            request_uart_send();
+            break;
+
             case PACKET_CMD_RACECYCLESULT_R:
             //todo buffering 로직 필요
             LOG_DEBUG("cmd PACKET_CMD_RACECYCLESULT_R");
 
             // 여기서 버퍼링을 하고 디바이스로 바로 응답을 보낸다.
-            unsigned char outpacket[MAX_PACKET_BUFFER];
+            
             memset(outpacket, 0x00, sizeof(outpacket));
-            int outpacketlen = 0;
+            memset(base_encode, 0x00, sizeof(base_encode));
+            outpacketlen = 0;
 
             // 받은 subcode를 싫어서 uart 응답 전송
             cmd_id = _AT_USER_CMD;
