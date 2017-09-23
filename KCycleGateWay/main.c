@@ -640,7 +640,7 @@ PairingInfo : [
                 is_uart_send = 0; //위에서 이미 전송 했음
 
             } else if (!strcmp(jobname, "raceCycleResultRequest")) {
-                char * value = from_json(jason_str, "Device");
+                char * value = from_json(jason_str, "DEV_ID");
 
                 base64_decode(value, strlen(value), base_decode);
                 int addr = getAddrFromDevices(base_decode);
