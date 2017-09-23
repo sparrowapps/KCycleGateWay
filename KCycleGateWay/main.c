@@ -641,12 +641,14 @@ PairingInfo : [
 
             } else if (!strcmp(jobname, "raceCycleResultRequest")) {
                 char * value = from_json(jason_str, "Device");
-                int device_addr = atoi(value);
-                LOG_DEBUG("cmd raceCycleResultRequest : device_addr %d", device_addr);
+
+                base64_decode(value, strlen(value), base_decode);
+                int addr = getAddrFromDevices(base_decode);
+                LOG_DEBUG("cmd raceCycleResultRequest : device_addr %d", addr);
                 //여기서 집접 모든 디바이스에 브로드 케스트 전송
-                make_packet(PACKET_CMD_RACERESULT_REQ_S, 0x00, device_addr, 0, NULL, outpacket, &outpacketlen);
+                make_packet(PACKET_CMD_RACERESULT_REQ_S, 0x00, addr, 0, NULL, outpacket, &outpacketlen);
                 base64_encode(outpacket, outpacketlen , base_encode);
-                sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", device_addr, base_encode);
+                sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", addr, base_encode);
 
             } else if (!strcmp(jobname, "raceLineResultExtra")) {
                 LOG_DEBUG("raceLineResultExtra : %s\n", jobname);
