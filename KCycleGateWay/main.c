@@ -626,16 +626,17 @@ PairingInfo : [
 
             } else if (!strcmp(jobname, "raceResultReady")) {
                 
-                make_racer_addr(jason_str);
+                LOG_DEBUG("raceResultReady : %s\n", jobname);
+                char * value = from_json(jason_str, "DEV_ID");
+                base64_decode(value, strlen(value), base_decode);
 
-                for (int i=0; i< racer_count; i++ ) {
-                    //여기서 집접 모든 디바이스에 브로드 케스트 전송
-                    make_packet(PACKET_CMD_RACERESULT_READY_S, 0x00, racer_addr[i], 0, NULL, outpacket, &outpacketlen);
-                    base64_encode(outpacket, outpacketlen , base_encode);
-                    sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", racer_addr[i], base_encode);
-    
-                    request_uart_send();
-                }
+                int addr = getAddrFromDevices(base_decode);
+
+                make_packet(PACKET_CMD_RACERESULT_READY_S, 0x00, addr, 0, NULL, outpacket, &outpacketlen);
+                base64_encode(outpacket, outpacketlen , base_encode);
+                sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", addr, base_encode);
+
+                request_uart_send();
                 is_uart_send = 0; //위에서 이미 전송 했음
 
             } else if (!strcmp(jobname, "raceCycleResultRequest")) {
