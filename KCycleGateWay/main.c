@@ -665,7 +665,7 @@ PairingInfo : [
                 char * idexbytearray = from_json(jason_str, "INDEX");
                 base64_decode(idexbytearray, strlen(idexbytearray), base_decode); //누락 인덱스 바이트 어레이
 
-                make_packet(PACKET_CMD_RACELINERESULT_EXTRA_S, 0x00, addr, 1, base_decode, outpacket, &outpacketlen);
+                make_packet(PACKET_CMD_RACELINERESULT_EXTRA_S, 0x00, addr, strlen(base_decode), base_decode, outpacket, &outpacketlen);
                 base64_encode(outpacket, outpacketlen , base_encode);
                 sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", addr, base_encode);
                 LOG_DEBUG("cmd_buffer[cmd_id] %s\n",cmd_buffer[cmd_id]);
