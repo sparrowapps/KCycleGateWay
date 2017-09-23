@@ -81,11 +81,6 @@ int packetnumberArray[MAX_DEVICES] = {0,};
 int gatewayPacketNumber = 0;
 // Key reset 되면 0
 
-
-// 재전송 카운트
-int retryCountDevice[MAX_DEVICES] = {0,}; // 디바이스가 재전송 횟수
-int retryCountGateway[MAX_DEVICES] = {0,}; // 게이트웨이가 재전송 횟수
-
 unsigned char last_packet_buffer[MAX_DEVICES][MAX_PACKET_BUFFER]; //마지막 만든 패킷 
 int last_packet_len[MAX_DEVICES] = {0,};
 
@@ -847,35 +842,8 @@ int packet_process(unsigned char * inputpacket, int addr)
         } 
 #endif
         // 게이트웨이  retry count 초기화
-        if(code != PACKET_CMD_RETRY) {
-            retryCountGateway[addr] = 0;
-        }
-
-        // 디바이스 retrty count 초기화
-        retryCountDevice[addr] = 0;
-
         switch (code)
         {
-            case PACKET_CMD_RETRY:
-            //마지막 패킷을 재전송 한다.
-            if (retryCountGateway[addr] > 3) {
-                retryCountGateway[addr] = 0 ;
-                
-                LOG_DEBUG("GATEWAY RETRY COUNT EXCEED");
-                valuebuf[0] = 12;
-                valuebuf[1] = 1;
-                SSLServerSend("/gateway/errorCheck", valuebuf, 2, addr);
-            } else {
-                cmd_id = _AT_USER_CMD;
-    
-                base64_encode(last_packet_buffer[addr], last_packet_len[addr] , base_encode);
-                sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", addr, base_encode);    
-                ipc_send_flag = 1;
-                request_uart_send();
-                retryCountGateway[addr] ++;
-            }
-            break;
-
             case PACKET_CMD_PING_R:
             //todo 내 senderid 를 만들어야 한다.
             LOG_DEBUG("cmd PACKET_CMD_PING_R");
@@ -962,10 +930,22 @@ int packet_process(unsigned char * inputpacket, int addr)
             SSLServerSend("/gateway/raceStop", valuebuf, len, addr);
             break;
 
+            case PACKET_CMD_RACE_END_R:
+            LOG_DEBUG("cmd PACKET_CMD_RACE_END_R");
+        
+            SSLServerSend("/gateway/raceEnd", valuebuf, len, addr);
+            break;
+
             case PACKET_CMD_RACERESULT_READY_R: //패턴2
             LOG_DEBUG("cmd PACKET_CMD_RACERESULT_READY_R");
         
             SSLServerSend("/gateway/raceResultReady", valuebuf, len, addr);
+            break;
+
+            case PACKET_CMD_RACELINERESULT_EXTRA_R: //패턴2
+            LOG_DEBUG("cmd PACKET_CMD_RACELINERESULT_EXTRA_R");
+            
+            SSLServerSend("/gateway/raceLineResultExtra", valuebuf, len, addr);
             break;
 
             case PACKET_CMD_RACELINERESULT_R:
@@ -976,8 +956,10 @@ int packet_process(unsigned char * inputpacket, int addr)
             SSLServerSend("/gateway/raceLineResult", valuebuf, len, addr);
             break;
 
-            case PACKET_CMD_RACERESULT_QUERY_R:
-            //서버로 보내야 하나?? 논의 필요
+            case PACKET_CMD_RACERESULT_REQ_R:
+            LOG_DEBUG("cmd PACKET_CMD_RACERESULT_REQ_R");
+        
+            SSLServerSend("/gateway/raceCycleResultRequest", valuebuf, len, addr);
             break;
 
             //건으로 부터 출발 신호를 받았다.
@@ -1071,28 +1053,9 @@ int packet_process(unsigned char * inputpacket, int addr)
             //nothing todo
             break;
         }
-    } else {
-        //retry 요청 전송
-        if (retryCountDevice[addr] > 3) {
-            retryCountDevice[addr] = 0 ;
-            
-            LOG_DEBUG("DEVCIE RETRY COUNT EXCEED");
-            valuebuf[0] = 11;
-            valuebuf[1] = 1;
-            SSLServerSend("/gateway/errorCheck", valuebuf, 2, addr);
-        } else {
-            usleep(1000 * 100);
-            retryCountDevice[addr] ++;
-
-            unsigned char outpacket[MAX_PACKET_BUFFER];
-            memset(outpacket, 0x00, sizeof(outpacket));
-
-            cmd_id = _AT_USER_CMD;
-            make_packet(0xff, 0x00, addr, 0, NULL, outpacket, &outpacketlen);
-            base64_encode(outpacket, outpacketlen , base_encode);
-            sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", addr, base_encode);    
-            ipc_send_flag = 1;
-        }
+    } else { 
+        //extract packet 실패
+        //nothing to doe
     }
     
     return 0;
