@@ -427,15 +427,6 @@ PairingInfo : [
     DEV_ADDR : 숫자값
 ]
 */
-                
-                if  ( !strcmp(jobname, "pairingInfo1") ) {
-                    host = 0;
-                } else if ( !strcmp(jobname, "pairingInfo2") ) {
-                    host = 1;
-                } else {
-                    host = 2;
-                }
-            
                 json_t *root;
                 json_error_t error;
                 char  *grp_id;
