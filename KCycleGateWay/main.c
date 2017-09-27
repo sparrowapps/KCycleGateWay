@@ -415,9 +415,7 @@ static void http_write( char *msg, int fd, int modem_addr) {
                 make_packet(PACKET_CMD_INSPECTION_REQ_S, 0x00, addr, 1, &irvalue, outpacket, &outpacketlen);
                 base64_encode(outpacket, outpacketlen , base_encode);
                 sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", addr, base_encode);    
-            } else if (!strcmp(jobname, "pairingInfo"))  { //pairingInfo
-
-
+            } else if ( !strcmp(jobname, "pairingInfo1") || !strcmp(jobname, "pairingInfo2") || !strcmp(jobname, "pairingInfo3") )  { //pairingInfo
 /*
 GRP_ID : base64(3)
 CHN : 숫자값
@@ -429,62 +427,68 @@ PairingInfo : [
     DEV_ADDR : 숫자값
 ]
 */
-#if 1
-            json_t *root;
-            json_error_t error;
-            char  *grp_id;
-            int chn;
-            int band;
-            int drate;
-            int count;
-            char decode_grp_id[10] = {0,};
-
-            json_t *pairinginfo;
-            root = json_loads(jason_str, 0, &error);
+                int host = 0; // 게이트웨이 번호
+                if  ( !strcmp(jobname, "pairingInfo1") ) {
+                    host = 0;
+                } else if ( !strcmp(jobname, "pairingInfo2") ) {
+                    host = 1;
+                } else {
+                    host = 2;
+                }
             
-            json_unpack(root, "{s:s, s:i, s:i, s:i, s:i }", 
-            "GRP_ID", &grp_id, 
-            "CHN", &chn, 
-            "BAND", &band, 
-            "DRATE", &drate, 
-            "COUNT", &count 
-            );
-    
-            LOG_DEBUG("GRP_ID : %s  :  %d", grp_id, strlen(grp_id));
+                json_t *root;
+                json_error_t error;
+                char  *grp_id;
+                int chn;
+                int band;
+                int drate;
+                int count;
+                char decode_grp_id[10] = {0,};
 
-            base64_decode(grp_id, strlen(grp_id) , decode_grp_id);
+                json_t *pairinginfo;
+                root = json_loads(jason_str, 0, &error);
+                
+                json_unpack(root, "{s:s, s:i, s:i, s:i, s:i }", 
+                "GRP_ID", &grp_id, 
+                "CHN", &chn, 
+                "BAND", &band, 
+                "DRATE", &drate, 
+                "COUNT", &count 
+                );
+        
+                LOG_DEBUG("GRP_ID : %s  :  %d", grp_id, strlen(grp_id));
 
-            LOG_DEBUG("GRP_ID : %02x %02x %02x", decode_grp_id[0], decode_grp_id[1], decode_grp_id[2]);
-            LOG_DEBUG("CHN : %d", chn);
-            LOG_DEBUG("BAND : %d", band);
-            LOG_DEBUG("DRATE : %d", drate);
-            LOG_DEBUG("COUNT : %d", count);
+                base64_decode(grp_id, strlen(grp_id) , decode_grp_id);
 
-            //AT command parameter update
-             sprintf(cmd_buffer[_AT_GRP_ID], AT_GRP_ID_FMT, decode_grp_id[0], decode_grp_id[1], decode_grp_id[2]);
-            //sprintf(cmd_buffer[_AT_GRP_ID], AT_GRP_ID_FMT, 0x6f, 0xff, 0xc4); // ip 19
-            //sprintf(cmd_buffer[_AT_GRP_ID], AT_GRP_ID_FMT, 0x69, 0xcf, 0x38); // ip 21
+                LOG_DEBUG("GRP_ID : %02x %02x %02x", decode_grp_id[0], decode_grp_id[1], decode_grp_id[2]);
+                LOG_DEBUG("CHN : %d", chn);
+                LOG_DEBUG("BAND : %d", band);
+                LOG_DEBUG("DRATE : %d", drate);
+                LOG_DEBUG("COUNT : %d", count);
 
-            sprintf(cmd_buffer[_AT_CHN], AT_CHN_FMT, chn);
-            sprintf(cmd_buffer[_AT_FBND], AT_FBAND_FMT, band);
-            sprintf(cmd_buffer[_AT_DRATE], AT_DRATE_FMT, drate);
+                //AT command parameter update
+                sprintf(cmd_buffer[_AT_GRP_ID], AT_GRPx_ID_FMT, host, decode_grp_id[0], decode_grp_id[1], decode_grp_id[2]);
 
-            // command 
-            LOG_DEBUG("[_AT_GRP_ID] : %s\n", cmd_buffer[_AT_GRP_ID]);
-            LOG_DEBUG("[_AT_CHN] : %s\n", cmd_buffer[_AT_CHN]);
-            LOG_DEBUG("[_AT_FBND] : %s\n", cmd_buffer[_AT_FBND]);
-            LOG_DEBUG("[_AT_DRATE] : %s\n", cmd_buffer[_AT_DRATE]);
-            
-            cmd_id = _AT_START; // +++ 전송
-            manaual_pairinig_status = _MANUAL_PAIRING_STATUS; // 메뉴얼 페어링 스테이터스
-            data_status = _DATA_AT_MODE;
+                sprintf(cmd_buffer[_AT_CHN], AT_CHNx_FMT, host, chn);
+                sprintf(cmd_buffer[_AT_FBND], AT_FBANDx_FMT,host, band);
+                sprintf(cmd_buffer[_AT_DRATE], AT_DRATEx_FMT,host, drate);
 
-            LOG_DEBUG("total pairing devices count : %d\n", count);
-            
-            devices_count = count;
-            device_idx = 0;
+                // command 
+                LOG_DEBUG("[_AT_GRP_ID] : %s\n", cmd_buffer[_AT_GRP_ID]);
+                LOG_DEBUG("[_AT_CHN] : %s\n", cmd_buffer[_AT_CHN]);
+                LOG_DEBUG("[_AT_FBND] : %s\n", cmd_buffer[_AT_FBND]);
+                LOG_DEBUG("[_AT_DRATE] : %s\n", cmd_buffer[_AT_DRATE]);
+                
+                cmd_id = _AT_START; // +++ 전송
+                manaual_pairinig_status = _MANUAL_PAIRING_STATUS; // 메뉴얼 페어링 스테이터스
+                data_status = _DATA_AT_MODE;
 
-            pairinginfo = json_object_get(root, "PairingInfo");
+                LOG_DEBUG("total pairing devices count : %d\n", count);
+                
+                devices_count = count;
+                device_idx = 0;
+
+                pairinginfo = json_object_get(root, "PairingInfo");
 
             for (int i = 0; i < json_array_size(pairinginfo); i++)
             {
@@ -527,7 +531,7 @@ PairingInfo : [
                 devices[i].dev_id[2],
                 devices[i].dev_addr );
             }
-#endif
+
                 //페어링 정보 어레이를 jansson  해석을 한다음 AT+CMD로 페어링 정보를 쏴야 한다.
             } else if (!strcmp(jobname, "trainingStart")) {
                 make_racer_addr(jason_str);

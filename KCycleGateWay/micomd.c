@@ -1268,7 +1268,7 @@ int parse_data (PBYTE data_buf, int *cnt)
     {
         if(cmd_state == _AT_RST)
         {
-            if(index >= 3)
+            if(index >= 4)
             {
                 return 1;
             }
@@ -1290,7 +1290,7 @@ int parse_data (PBYTE data_buf, int *cnt)
         if(cmd_state == -1)
         {
 
-            if(index >= 3)
+            if(index >= 4)
             {
                 return 1;
             }

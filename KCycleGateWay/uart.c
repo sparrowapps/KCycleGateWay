@@ -29,7 +29,7 @@ static int initport(int fd)
 
     bzero (&newoptions, sizeof (newoptions));
 
-    newoptions.c_cflag  = (CLOCAL | CREAD | CS8 | B9600);
+    newoptions.c_cflag  = (CLOCAL | CREAD | CS8 | B19200);
     newoptions.c_iflag      = IGNPAR;
     newoptions.c_oflag      = 0;
     newoptions.c_lflag      = 0;
