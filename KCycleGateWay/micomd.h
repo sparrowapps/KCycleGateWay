@@ -137,9 +137,9 @@ Content-Type: application/json\n\
 #define AT_REG_ID_FMT   "AT+REG_#ID=%d,%02X %02X %02X\r\n"
 
 #define AT_GRPx_ID_FMT   "AT+GRP%d_ID=%02X %02X %02X\r\n"
-#define AT_FBANDx_FMT    "AT+FBND%d=%d\r\n"
-#define AT_CHNx_FMT      "AT+CHN%d=%d\r\n"
-#define AT_DRATEx_FMT    "AT+DRATE%d=%d\r\n"
+#define AT_FxBAND_FMT    "AT+F%dBND=%d\r\n"
+#define AT_xCHN_FMT      "AT+%dCHN=%d\r\n"
+#define AT_DxRATE_FMT    "AT+D%dRATE=%d\r\n"
 
 typedef enum AT_CMD {               
     _AT_START    = 0,       

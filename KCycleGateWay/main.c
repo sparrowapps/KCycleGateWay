@@ -427,7 +427,7 @@ PairingInfo : [
     DEV_ADDR : 숫자값
 ]
 */
-                int host = 0; // 게이트웨이 번호
+                
                 if  ( !strcmp(jobname, "pairingInfo1") ) {
                     host = 0;
                 } else if ( !strcmp(jobname, "pairingInfo2") ) {
@@ -443,17 +443,19 @@ PairingInfo : [
                 int band;
                 int drate;
                 int count;
+                int host = 0; // 게이트웨이 번호
                 char decode_grp_id[10] = {0,};
 
                 json_t *pairinginfo;
                 root = json_loads(jason_str, 0, &error);
                 
-                json_unpack(root, "{s:s, s:i, s:i, s:i, s:i }", 
+                json_unpack(root, "{s:s, s:i, s:i, s:i, s:i, s:i }", 
                 "GRP_ID", &grp_id, 
                 "CHN", &chn, 
                 "BAND", &band, 
                 "DRATE", &drate, 
-                "COUNT", &count 
+                "COUNT", &count,
+                "HOST", &host 
                 );
         
                 LOG_DEBUG("GRP_ID : %s  :  %d", grp_id, strlen(grp_id));
@@ -465,13 +467,21 @@ PairingInfo : [
                 LOG_DEBUG("BAND : %d", band);
                 LOG_DEBUG("DRATE : %d", drate);
                 LOG_DEBUG("COUNT : %d", count);
-
+                LOG_DEBUG("HOST : %d", host);
                 //AT command parameter update
-                sprintf(cmd_buffer[_AT_GRP_ID], AT_GRPx_ID_FMT, host, decode_grp_id[0], decode_grp_id[1], decode_grp_id[2]);
+                
 
-                sprintf(cmd_buffer[_AT_CHN], AT_CHNx_FMT, host, chn);
-                sprintf(cmd_buffer[_AT_FBND], AT_FBANDx_FMT,host, band);
-                sprintf(cmd_buffer[_AT_DRATE], AT_DRATEx_FMT,host, drate);
+                if ( !strcmp(jobname, "pairingInfo1") ) {
+                    sprintf(cmd_buffer[_AT_GRP_ID], AT_GRP_ID_FMT, decode_grp_id[0], decode_grp_id[1], decode_grp_id[2]);
+                    sprintf(cmd_buffer[_AT_CHN], AT_CHN_FMT,  chn);
+                    sprintf(cmd_buffer[_AT_FBND], AT_FBAND_FMT, band);
+                    sprintf(cmd_buffer[_AT_DRATE], AT_DRATE_FMT, drate);
+                } else {
+                    sprintf(cmd_buffer[_AT_GRP_ID], AT_GRPx_ID_FMT, host, decode_grp_id[0], decode_grp_id[1], decode_grp_id[2]);
+                    sprintf(cmd_buffer[_AT_CHN], AT_xCHN_FMT, host, chn);
+                    sprintf(cmd_buffer[_AT_FBND], AT_FxBAND_FMT,host, band);
+                    sprintf(cmd_buffer[_AT_DRATE], AT_DxRATE_FMT,host, drate);
+                }
 
                 // command 
                 LOG_DEBUG("[_AT_GRP_ID] : %s\n", cmd_buffer[_AT_GRP_ID]);
