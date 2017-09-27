@@ -964,6 +964,7 @@ int packet_process(unsigned char * inputpacket, int addr)
 
             //건으로 부터 출발 신호를 받았다.
             case PACKET_CMD_RACESTART_GUN_R: 
+            case PACKET_CMD_RACESTART_GUN2_R:
             LOG_DEBUG("cmd PACKET_CMD_RACESTART_GUN_R : racer count %d", racer_count);
             for (int i = 0; i < racer_count; i ++ ){
                 racer_idx[i] = -1;
@@ -988,7 +989,8 @@ int packet_process(unsigned char * inputpacket, int addr)
             memset(base_encode, 0x00, sizeof(base_encode));
             outpacketlen = 0;
 
-            make_packet(PACKET_CMD_RACESTART_GUN_S, 0x00, addr, 0, NULL, outpacket, &outpacketlen);
+            //건이 2가지 커맨드라서 code + 1로 응답 한다.
+            make_packet(code + 1, 0x00, addr, 0, NULL, outpacket, &outpacketlen);
             base64_encode(outpacket, outpacketlen , base_encode);
             sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", addr, base_encode);
             LOG_DEBUG("cmd PACKET_CMD_RACESTART_GUN_R : cmdbuffer : %s", cmd_buffer[_AT_USER_CMD]);

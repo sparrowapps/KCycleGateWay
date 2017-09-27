@@ -599,7 +599,7 @@ PairingInfo : [
                 // 레이스 디바이스 리스트 확보
                 make_racer_addr(jason_str);
 
-#if 1 //건이 없어서.. 걍 쏜다.
+#if 0 //건이 없어서.. 걍 쏜다.
                 for (int i = 0; i< racer_count; i++ ) { // 경기 참여 디바이스에 RACE sTART 전송
                     memset(outpacket, 0x00, sizeof(outpacket));
                     memset(base_encode, 0x00, sizeof(base_encode));
