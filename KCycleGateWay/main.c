@@ -831,12 +831,12 @@ void init_uart_data() {
 }
 
 // JSON 만들기
-char * make_json(int addr, char * value) 
+char * make_json(char * dev_id, char * value) 
 {
     json_t* root;
     char * str;
 
-    root  = json_pack("{s:i, s:s}", "Addr", addr, "Value", value);
+    root  = json_pack("{s:s, s:s}", "DEV_ID", dev_id, "Value", value);
     str = json_dumps(root, JSON_ENCODE_ANY);
     return str;
 }
@@ -875,6 +875,7 @@ void SSLServerSend(char *url, char *value, int valuelen, int modem_addr) {
 
     unsigned char * buf;
     unsigned char base_encode[MAX_HTTPS_PACKET_BUFFER];
+    unsigned char base_dev_id[10];
 
     struct gateway_op *message = message_queue_message_alloc_blocking(&https_queue);
     message->operation = OP_WRITE_HTTP;
@@ -883,7 +884,14 @@ void SSLServerSend(char *url, char *value, int valuelen, int modem_addr) {
     if (value != NULL) {
         memset(base_encode, 0x00, sizeof(base_encode));
         base64_encode(value, valuelen , base_encode);
-        char *json = make_json(modem_addr, base_encode);
+
+        // mode_addr to dev_id
+        memset(base_dev_id, 0x00, sizeof(dev_id));
+        char * dev_id = getDevIDFromDevices(modem_addr); 
+        base64_encode(dev_id, 3, base_dev_id);
+        LOG_DEBUG("DEV_ID %x %x %x : DEV_ID base64 encode : %s", dev_id, dev_id + 1, dev_id + 2, base_dev_id);
+
+        char *json = make_json(dev_id, base_encode);
         if (ssl_server_ip == NULL) {
             sprintf(buf, HTTPS_HEADER, url,  HTTPS_IP_ADDR, HTTPS_PORT_NUM, strlen(json) + 100, json);
         } else {
