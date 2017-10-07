@@ -468,11 +468,13 @@ PairingInfo : [
                     sprintf(cmd_buffer[_AT_FBND], AT_FBAND_FMT, band);
                     sprintf(cmd_buffer[_AT_DRATE], AT_DRATE_FMT, drate);
                     sprintf(cmd_buffer[_AT_MADD], AT_MADD_FMT, host);
+                    manaual_pairinig_status = _MANUAL_PAIRING_HOST;
                 } else {
                     sprintf(cmd_buffer[_AT_GRP_ID], AT_GRPx_ID_FMT, host, decode_grp_id[0], decode_grp_id[1], decode_grp_id[2]);
                     sprintf(cmd_buffer[_AT_CHN], AT_xCHN_FMT, host, chn);
                     sprintf(cmd_buffer[_AT_FBND], AT_FxBAND_FMT,host, band);
                     sprintf(cmd_buffer[_AT_DRATE], AT_DxRATE_FMT,host, drate);
+                    manaual_pairinig_status = _MANUAL_PAIRING_STATUS;
                 }
 
                 // command 
@@ -482,7 +484,7 @@ PairingInfo : [
                 LOG_DEBUG("[_AT_DRATE] : %s\n", cmd_buffer[_AT_DRATE]);
                 
                 cmd_id = _AT_START; // +++ 전송
-                manaual_pairinig_status = _MANUAL_PAIRING_STATUS; // 메뉴얼 페어링 스테이터스
+                 // 메뉴얼 페어링 스테이터스
                 data_status = _DATA_AT_MODE;
 
                 LOG_DEBUG("total pairing devices count : %d\n", count);
