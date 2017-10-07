@@ -467,6 +467,7 @@ PairingInfo : [
                     sprintf(cmd_buffer[_AT_CHN], AT_CHN_FMT,  chn);
                     sprintf(cmd_buffer[_AT_FBND], AT_FBAND_FMT, band);
                     sprintf(cmd_buffer[_AT_DRATE], AT_DRATE_FMT, drate);
+                    sprintf(cmd_buffer[_AT_MADD], AT_MADD_FMT, host);
                 } else {
                     sprintf(cmd_buffer[_AT_GRP_ID], AT_GRPx_ID_FMT, host, decode_grp_id[0], decode_grp_id[1], decode_grp_id[2]);
                     sprintf(cmd_buffer[_AT_CHN], AT_xCHN_FMT, host, chn);

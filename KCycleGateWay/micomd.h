@@ -135,6 +135,7 @@ Content-Type: application/json\n\
 #define AT_CHN_FMT      "AT+CHN=%d\r\n"
 #define AT_DRATE_FMT    "AT+DRATE=%d\r\n"
 #define AT_REG_ID_FMT   "AT+REG_#ID=%d,%02X %02X %02X\r\n"
+#define AT_MADD_FMT     "AT+MADD=%d\r\n"
 
 #define AT_GRPx_ID_FMT   "AT+GRP%d_ID=%02X %02X %02X\r\n"
 #define AT_FxBAND_FMT    "AT+F%dBND=%d\r\n"
@@ -181,6 +182,7 @@ typedef enum REST_STATUS {
 typedef enum MANUAL_PAIRING_STATUS {
     _MANUAL_PAIRING_NONE = 0,
     _MANUAL_PAIRING_STATUS = 1,
+    _MANUAL_PAIRING_HOST = 2,
 } MANUAL_PAIRING_STATUS_TYPE;
 
 // 계측기 리스트 

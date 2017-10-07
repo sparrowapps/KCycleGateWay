@@ -618,7 +618,7 @@ int check_uart (PBYTE data_buf)
         {
             case _AT_ACODE:
 
-                if (manaual_pairinig_status == _MANUAL_PAIRING_STATUS )
+                if (manaual_pairinig_status != _MANUAL_PAIRING_NONE )
                 {
                     cmd_id = _AT_GRP_ID;
                     ipc_send_flag = 1;
@@ -652,11 +652,13 @@ int check_uart (PBYTE data_buf)
                 break;
 
             case _AT_FBND:
-                if (manaual_pairinig_status == _MANUAL_PAIRING_STATUS) {
-                    cmd_id = _AT_CHN;
-                } else {               
+                 if (manaual_pairinig_status == _MANUAL_PAIRING_STATUS) {
+                     cmd_id = _AT_CHN;
+                 } else if (manaual_pairinig_status == _MANUAL_PAIRING_HOST) {               
                     cmd_id = _AT_MADD;
-                }
+                 } else {
+                    cmd_id = _AT_CHN;
+                 }
                 ipc_send_flag = 1;
                 break;
 
@@ -666,7 +668,7 @@ int check_uart (PBYTE data_buf)
                 break;
 
             case _AT_CHN:
-                if (manaual_pairinig_status == _MANUAL_PAIRING_STATUS) {
+                if (manaual_pairinig_status != _MANUAL_PAIRING_NONE ) {
                     cmd_id = _AT_DRATE;
                     device_idx = 0;
                 } else {
@@ -683,7 +685,7 @@ int check_uart (PBYTE data_buf)
 
             case _AT_DRATE:
             case _AT_REG_ID:
-                if (manaual_pairinig_status == _MANUAL_PAIRING_STATUS) {
+                if (manaual_pairinig_status != _MANUAL_PAIRING_NONE ) {
                     LOG_DEBUG("device_idx : %d, %d", device_idx,devices_count);
                     cmd_id = _AT_REG_ID;
                     // 디바이스 리스트 를 엎어야 한다.
