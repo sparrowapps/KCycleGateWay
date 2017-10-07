@@ -856,7 +856,7 @@ int packet_process(unsigned char * inputpacket, int addr)
 
             case PACKET_CMD_INSPECTION_REQ_R: // 패턴2
             LOG_DEBUG("PACKET_CMD_INSPECTION_REQ_R");
-
+            LOG_DEBUG("PACKET_CMD_INSPECTION_REQ_R valuebuf: %x len :%d", *valuebuf, len );
             SSLServerSend("/gateway/inspectionRequest", valuebuf, len, addr);
             break;
 
