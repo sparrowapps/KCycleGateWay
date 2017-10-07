@@ -894,7 +894,7 @@ void SSLServerSend(char *url, char *value, int valuelen, int modem_addr) {
         base64_encode(dev_id, 3, base_dev_id);
         LOG_DEBUG("DEV_ID %x %x %x : DEV_ID base64 encode : %s", dev_id, dev_id + 1, dev_id + 2, base_dev_id);
 
-        char *json = make_json(dev_id, base_encode);
+        char *json = make_json(base_dev_id, base_encode);
         if (ssl_server_ip == NULL) {
             sprintf(buf, HTTPS_HEADER, url,  HTTPS_IP_ADDR, HTTPS_PORT_NUM, strlen(json) + 100, json);
         } else {
