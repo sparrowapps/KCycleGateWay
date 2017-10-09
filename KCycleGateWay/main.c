@@ -752,9 +752,6 @@ PairingInfo : [
 
             sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", modem_addr, base_encode);
 
-            //encrypt key update
-            memcpy(Key, base_decode + 5, CRL_AES192_KEY); //24 byte key update
-
         } else if (strcmp(res, "errorCheck") == 0) {
             int outpacketlen = 0;
             make_packet(PACKET_CMD_INSPECTION_RES_S, 0x00, modem_addr, 0, NULL, outpacket, &outpacketlen);
@@ -765,6 +762,16 @@ PairingInfo : [
 
         } else if (strcmp(res, "dashResult") == 0) {
             make_packet(PACKET_CMD_INSPECTION_RES_S, 0x00, modem_addr, 0, NULL, outpacket, &outpacketlen);
+            
+            base64_encode(outpacket, outpacketlen , base_encode);
+
+            sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", modem_addr, base_encode);
+
+        } else if (strcmp(res, "raceStateCheck") == 0) {
+            char * value = from_json(jason_str, "Value");
+            base64_decode(value, strlen(value), base_decode);
+
+            make_packet(PACKET_CMD_RACESTATECHK_S, 0x00, modem_addr, strlen(base_decode), base_decode, outpacket, &outpacketlen);
             
             base64_encode(outpacket, outpacketlen , base_encode);
 
