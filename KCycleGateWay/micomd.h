@@ -160,7 +160,8 @@ typedef enum AT_CMD {
     _AT_REG_ID   = 14,
     _AT_GRP_ID_GET = 15,
     _AT_MADD_GET   = 16,
-    _AT_USER_CMD = 17, 
+    _AT_DEL_ALL_ID = 17,
+    _AT_USER_CMD = 18, 
     _AT_CMD_NONE = 19, 
 } AT_CMD_TYPE;          
 
@@ -183,6 +184,7 @@ typedef enum MANUAL_PAIRING_STATUS {
     _MANUAL_PAIRING_NONE = 0,
     _MANUAL_PAIRING_STATUS = 1,
     _MANUAL_PAIRING_HOST = 2,
+    _MANUAL_PAIRING_DELETE = 3,
 } MANUAL_PAIRING_STATUS_TYPE;
 
 // 계측기 리스트 

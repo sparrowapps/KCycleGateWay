@@ -130,6 +130,7 @@ BYTE cmd_buffer[MAX_CMD][MAX_PACKET_BUFFER] =
     "AT+REG_#ID=2, 01 23 45\r\n",       // 14
     "AT+GRP_ID?\r\n",                   // 15
     "AT+MADD?\r\n",                     // 16
+    "AT+DEL_AID\r\n"                    // 17
     "",
 };
 
@@ -618,7 +619,14 @@ int check_uart (PBYTE data_buf)
         {
             case _AT_ACODE:
 
-                if (manaual_pairinig_status != _MANUAL_PAIRING_NONE )
+                if (manaual_pairinig_status == _MANUAL_PAIRING_DELETE)
+                {
+                    cmd_id = _AT_DEL_ALL_ID;
+                    ipc_send_flag = 1;
+                    break;
+                }
+
+                if (manaual_pairinig_status == _MANUAL_PAIRING_STATUS || manaual_pairinig_status == _MANUAL_PAIRING_HOST )
                 {
                     cmd_id = _AT_GRP_ID;
                     ipc_send_flag = 1;
@@ -718,6 +726,12 @@ int check_uart (PBYTE data_buf)
                 ipc_send_flag = 0;
                 pair_status = _PAIRED;
                 break;
+            
+            case _AT_DEL_ALL_ID:
+                cmd_id = _AT_RST;
+                rst_status = _RESET_STATUS;
+                data_status = _DATA_RF_MODE;
+                break;
 
             default:
                 ipc_send_flag = 0;
@@ -755,7 +769,13 @@ int check_uart (PBYTE data_buf)
     {
         LOG_DEBUG("MADD : %s", data_buf);
 
-        cmd_id = _AT_LST_ID; //
+        //cmd_id = _AT_LST_ID; // 리스트 얻기 제거됨
+        // 리셋
+        cmd_id = _AT_RST;
+        rst_status = _RESET_STATUS;
+        list_end = 0;
+        data_status = _DATA_RF_MODE;
+        
         ipc_send_flag = 1;
     }
     else if(cmd_state == _AT_LST_ID)

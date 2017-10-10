@@ -494,49 +494,107 @@ PairingInfo : [
 
                 pairinginfo = json_object_get(root, "PairingInfo");
 
-            for (int i = 0; i < json_array_size(pairinginfo); i++)
-            {
-                json_t *data, *dev_id, *dev_addr;
-                const char * dev_id_str;
-                int dev_addr_val;
-                char decode_dev_id[10] = {0,};
-                data = json_array_get(pairinginfo, i);
-                if(!json_is_object(data))
+                for (int i = 0; i < json_array_size(pairinginfo); i++)
                 {
-                    LOG_DEBUG("error: commit data %d is not an object\n", (int)(i + 1));
-                    json_decref(root);
-                }
+                    json_t *data, *dev_id, *dev_addr;
+                    const char * dev_id_str;
+                    int dev_addr_val;
+                    char decode_dev_id[10] = {0,};
+                    data = json_array_get(pairinginfo, i);
+                    if(!json_is_object(data))
+                    {
+                        LOG_DEBUG("error: commit data %d is not an object\n", (int)(i + 1));
+                        json_decref(root);
+                    }
 
-                dev_id = json_object_get(data, "DEV_ID");
-                if(!json_is_string(dev_id))
-                {
-                    LOG_DEBUG("error: DEV_ID %d: DEV_ID is not a string\n", (int)(i + 1));
-                }
-                dev_id_str = json_string_value(dev_id);
-                memset(decode_dev_id, 0x00, sizeof(decode_dev_id));
-                base64_decode(dev_id_str, strlen(dev_id_str) , decode_dev_id);
+                    dev_id = json_object_get(data, "DEV_ID");
+                    if(!json_is_string(dev_id))
+                    {
+                        LOG_DEBUG("error: DEV_ID %d: DEV_ID is not a string\n", (int)(i + 1));
+                    }
+                    dev_id_str = json_string_value(dev_id);
+                    memset(decode_dev_id, 0x00, sizeof(decode_dev_id));
+                    base64_decode(dev_id_str, strlen(dev_id_str) , decode_dev_id);
 
-                dev_addr = json_object_get(data, "DEV_ADDR");
-                if(!json_is_integer(dev_addr))
-                {
-                    LOG_DEBUG("error: DEV_ADDR %d: DEV_ADDR is not a integer\n", (int)(i + 1));
-                }
-                dev_addr_val = json_integer_value(dev_addr);
-                
-                devices[i].dev_id[0] = decode_dev_id[0];
-                devices[i].dev_id[1] = decode_dev_id[1];
-                devices[i].dev_id[2] = decode_dev_id[2];
-                devices[i].dev_addr  = dev_addr_val;
+                    dev_addr = json_object_get(data, "DEV_ADDR");
+                    if(!json_is_integer(dev_addr))
+                    {
+                        LOG_DEBUG("error: DEV_ADDR %d: DEV_ADDR is not a integer\n", (int)(i + 1));
+                    }
+                    dev_addr_val = json_integer_value(dev_addr);
+                    
+                    devices[i].dev_id[0] = decode_dev_id[0];
+                    devices[i].dev_id[1] = decode_dev_id[1];
+                    devices[i].dev_id[2] = decode_dev_id[2];
+                    devices[i].dev_addr  = dev_addr_val;
 
-                LOG_DEBUG("devices[%d] dev_id[%02x, %02x, %02x, dev_addr: %d"
-                ,i,
-                devices[i].dev_id[0],
-                devices[i].dev_id[1],
-                devices[i].dev_id[2],
-                devices[i].dev_addr );
-            }
+                    LOG_DEBUG("devices[%d] dev_id[%02x, %02x, %02x, dev_addr: %d"
+                    ,i,
+                    devices[i].dev_id[0],
+                    devices[i].dev_id[1],
+                    devices[i].dev_id[2],
+                    devices[i].dev_addr );
+                }
 
                 //페어링 정보 어레이를 jansson  해석을 한다음 AT+CMD로 페어링 정보를 쏴야 한다.
+            }else if (!strcmp(jobname, "pairingList")) {
+                json_t *root;
+                json_error_t error;
+                char  *grp_id;
+
+                json_t *pairinginfo;
+                root = json_loads(jason_str, 0, &error);
+                
+                pairinginfo = json_object_get(root, "PairingList");
+
+                for (int i = 0; i < json_array_size(pairinginfo); i++)
+                {
+                    json_t *data, *dev_id, *dev_addr;
+                    const char * dev_id_str;
+                    int dev_addr_val;
+                    char decode_dev_id[10] = {0,};
+                    data = json_array_get(pairinginfo, i);
+                    if(!json_is_object(data))
+                    {
+                        LOG_DEBUG("error: commit data %d is not an object\n", (int)(i + 1));
+                        json_decref(root);
+                    }
+
+                    dev_id = json_object_get(data, "DEV_ID");
+                    if(!json_is_string(dev_id))
+                    {
+                        LOG_DEBUG("error: DEV_ID %d: DEV_ID is not a string\n", (int)(i + 1));
+                    }
+                    dev_id_str = json_string_value(dev_id);
+                    memset(decode_dev_id, 0x00, sizeof(decode_dev_id));
+                    base64_decode(dev_id_str, strlen(dev_id_str) , decode_dev_id);
+
+                    dev_addr = json_object_get(data, "DEV_ADDR");
+                    if(!json_is_integer(dev_addr))
+                    {
+                        LOG_DEBUG("error: DEV_ADDR %d: DEV_ADDR is not a integer\n", (int)(i + 1));
+                    }
+                    dev_addr_val = json_integer_value(dev_addr);
+                    
+                    devices[i].dev_id[0] = decode_dev_id[0];
+                    devices[i].dev_id[1] = decode_dev_id[1];
+                    devices[i].dev_id[2] = decode_dev_id[2];
+                    devices[i].dev_addr  = dev_addr_val;
+
+                    LOG_DEBUG("devices[%d] dev_id[%02x, %02x, %02x, dev_addr: %d"
+                    ,i,
+                    devices[i].dev_id[0],
+                    devices[i].dev_id[1],
+                    devices[i].dev_id[2],
+                    devices[i].dev_addr );
+                }
+            }else if (!strcmp(jobname, "deletePairingInfo")) {
+                manaual_pairinig_status = _MANUAL_PAIRING_DELETE;
+                
+                cmd_id = _AT_START; // +++ 전송
+                 // 메뉴얼 페어링 스테이터스
+                data_status = _DATA_AT_MODE;
+
             } else if (!strcmp(jobname, "trainingStart")) {
                 make_racer_addr(jason_str);
                 
