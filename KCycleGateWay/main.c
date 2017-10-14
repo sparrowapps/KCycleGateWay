@@ -678,6 +678,7 @@ PairingInfo : [
             } else if (!strcmp(jobname, "raceStartGun")) { //테스트 건이 없어서
                 // 레이스 디바이스 리스트 확보
                 make_racer_addr(jason_str);
+                LOG_DEBUG("RraceStartGun RACER COUNT : %d", racer_count);
 
 #if 1 //건이 없어서.. 걍 쏜다.
                 for (int i = 0; i< racer_count; i++ ) { // 경기 참여 디바이스에 RACE sTART 전송
