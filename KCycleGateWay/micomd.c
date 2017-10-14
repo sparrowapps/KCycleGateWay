@@ -618,6 +618,11 @@ int check_uart (PBYTE data_buf)
     {
         switch(cmd_state)
         {
+            case _AT_ACK_EN:
+                cmd_id = _AT_MADD_GET;
+                ipc_send_flag = 1;
+            break;
+
             case _AT_ACODE:
 
                 if (manaual_pairinig_status == _MANUAL_PAIRING_DELETE)
@@ -765,11 +770,7 @@ int check_uart (PBYTE data_buf)
         }
         cmd_id = _AT_ACK_EN;
         ipc_send_flag = 1;
-    }
-    else if (cmd_state == _AT_ACK_EN ) {
-        cmd_id = _AT_MADD_GET;
-        ipc_send_flag = 1;
-    }
+    } 
     else if (cmd_state == _AT_MADD_GET) // MADD 얻기
     {
         LOG_DEBUG("MADD : %s", data_buf);
