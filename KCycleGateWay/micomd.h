@@ -161,8 +161,9 @@ typedef enum AT_CMD {
     _AT_GRP_ID_GET = 15,
     _AT_MADD_GET   = 16,
     _AT_DEL_ALL_ID = 17,
-    _AT_USER_CMD = 18, 
-    _AT_CMD_NONE = 19, 
+    _AT_ACK_EN     = 18, 
+    _AT_USER_CMD = 19, 
+    _AT_CMD_NONE = 20, 
 } AT_CMD_TYPE;          
 
 typedef enum DATA_STATUS {

@@ -130,7 +130,8 @@ BYTE cmd_buffer[MAX_CMD][MAX_PACKET_BUFFER] =
     "AT+REG_#ID=2, 01 23 45\r\n",       // 14
     "AT+GRP_ID?\r\n",                   // 15
     "AT+MADD?\r\n",                     // 16
-    "AT+DEL_AID=1\r\n"                    // 17
+    "AT+DEL_AID=1\r\n",                 // 17
+    "AT+ACK_EN=1\r\n",                  // 18
     "",
 };
 
@@ -762,6 +763,10 @@ int check_uart (PBYTE data_buf)
         
             LOG_DEBUG("group id[%d] = %02x    \n", i, grp_id[i]);
         }
+        cmd_id = _AT_ACK_EN;
+        ipc_send_flag = 1;
+    }
+    else if (cmd_state == _AT_ACK_EN ) {
         cmd_id = _AT_MADD_GET;
         ipc_send_flag = 1;
     }
@@ -1407,6 +1412,7 @@ int write_packet (int fd, PBYTE pbuf, int size) {
     if(fd > 0) {
         do {
             wrtsize += write(fd, pbuf+wrtsize, size-wrtsize);
+            if (wrtsize <= 0) LOG_DEBUG("write packet minus size(%d)\n", wrtsize);
         } while ((size - wrtsize) > 0);
 
         LOG_DEBUG("write packet fd(%d), size(%d)\n", fd, size);
