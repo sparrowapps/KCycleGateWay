@@ -675,7 +675,25 @@ PairingInfo : [
                 }
                 is_uart_send = 0;
 #endif
-                
+            } else if (!strcmp(jobname, "raceStartGun")) { //테스트 건이 없어서
+                // 레이스 디바이스 리스트 확보
+                make_racer_addr(jason_str);
+
+#if 1 //건이 없어서.. 걍 쏜다.
+                for (int i = 0; i< racer_count; i++ ) { // 경기 참여 디바이스에 RACE sTART 전송
+                    memset(outpacket, 0x00, sizeof(outpacket));
+                    memset(base_encode, 0x00, sizeof(base_encode));
+                    outpacketlen = 0;
+
+                    make_packet(PACKET_CMD_RACESTART_S, 0x00, racer_addr[i], 0, NULL, outpacket, &outpacketlen);
+                    base64_encode(outpacket, outpacketlen , base_encode);
+                    sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", racer_addr[i], base_encode);
+                    LOG_DEBUG("cmd PACKET_CMD_RACESTART_S : cmdbuffer : %s", cmd_buffer[_AT_USER_CMD]);
+                    
+                    request_uart_send();
+                }
+                is_uart_send = 0;
+#endif
             } else if (!strcmp(jobname, "raceStop")) {
                 
                 make_racer_addr(jason_str);
