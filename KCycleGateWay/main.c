@@ -220,16 +220,19 @@ static void handle_socket_data(int fd) {
 // 소켓 리케스트 처리
 // 패턴2 서버에서 소켓으로 먼저 리퀘스트가 올때 whatIsMyjob ssl 전송을 해야 한다.
 static void handle_socket_request(int fd, char *request) {
-    unsigned char * buf;
+    unsigned char sslUrlBuf[40] = {0, };
+    if (!strncmp(request, "YouHaveAJob", strlen("YouHaveAJob"))) {
+        char * code = strstr(request, "YouHaveAJob");
+        LOG_DEBUG("%s\n", request);
 
-    if (!strcmp(request, "YouHaveAJob")) {
-        LOG_DEBUG("YouHaveAJob\n");
         write(fd,"OK\0",4); //ok 응답
+        
         close(fd);
         del_socket(fd);
 
-        LOG_DEBUG("whatIsMyJob\n");
-        SSLServerSend("/gateway/whatIsMyJob", NULL, 0, -1);
+        sprintf(sslUrlBuf,"/gateway/whatIsMyJob?%s", code);
+        LOG_DEBUG("%s\n", sslUrlBuf);
+        SSLServerSend(sslUrlBuf, NULL, 0, -1);
     } else {
         close(fd);
         del_socket(fd);
