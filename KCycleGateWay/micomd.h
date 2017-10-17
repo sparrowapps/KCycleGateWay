@@ -265,6 +265,9 @@ typedef struct list_id {
 #define PACKET_CMD_RACECYCLESULT_R  0x48
 #define PACKET_CMD_RACECYCLESULT_S  0x49
 
+#define PACKET_CMD_RACERESULT_END_S   0x4A
+#define PACKET_CMD_RACERESULT_END_R   0x4B
+
 #define RST 9
 #define PIO 7
 

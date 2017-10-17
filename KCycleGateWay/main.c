@@ -222,7 +222,7 @@ static void handle_socket_data(int fd) {
 static void handle_socket_request(int fd, char *request) {
     unsigned char sslUrlBuf[40] = {0, };
     if (!strncmp(request, "YouHaveAJob", strlen("YouHaveAJob"))) {
-        char * code = strstr(request, "YouHaveAJob");
+        char * code = strstr(request, "YouHaveAJob") + strlen("YouHaveAJob");
         LOG_DEBUG("%s\n", request);
 
         write(fd,"OK\0",4); //ok 응답
@@ -733,7 +733,7 @@ PairingInfo : [
                 base64_decode(value, strlen(value), base_decode);
                 int addr = getAddrFromDevices(base_decode);
                 LOG_DEBUG("cmd raceCycleResultRequest : device_addr %d", addr);
-                //여기서 집접 모든 디바이스에 브로드 케스트 전송
+                
                 make_packet(PACKET_CMD_RACERESULT_REQ_S, 0x00, addr, 0, NULL, outpacket, &outpacketlen);
                 base64_encode(outpacket, outpacketlen , base_encode);
                 sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", addr, base_encode);
@@ -757,6 +757,18 @@ PairingInfo : [
                 base64_encode(outpacket, outpacketlen , base_encode);
                 sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", addr, base_encode);
                 LOG_DEBUG("cmd_buffer[cmd_id] %s\n",cmd_buffer[cmd_id]);
+
+            } else if (!strcmp(jobname, "raceResultEnd")) {
+                LOG_DEBUG("raceResultEnd : %s\n", jobname);
+                char * value = from_json(jason_str, "DEV_ID");
+                
+                base64_decode(value, strlen(value), base_decode);
+                int addr = getAddrFromDevices(base_decode);
+                LOG_DEBUG("cmd raceResultEnd : device_addr %d", addr);
+                
+                make_packet(PACKET_CMD_RACERESULT_END_S, 0x00, addr, 0, NULL, outpacket, &outpacketlen);
+                base64_encode(outpacket, outpacketlen , base_encode);
+                sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", addr, base_encode);
 
             } else {
                 // json 파싱 종료
@@ -926,7 +938,11 @@ char * make_json(char * dev_id, char * value)
     json_t* root;
     char * str;
 
-    root  = json_pack("{s:s, s:s}", "DEV_ID", dev_id, "Value", value);
+    if (value != NULL) {
+        root  = json_pack("{s:s, s:s}", "DEV_ID", dev_id, "Value", value);
+    } else {
+        root  = json_pack("{s:s}", "DEV_ID", dev_id);
+    }
     str = json_dumps(root, JSON_ENCODE_ANY);
     return str;
 }
@@ -966,41 +982,35 @@ void SSLServerSend(char *url, char *value, int valuelen, int modem_addr) {
     unsigned char * buf;
     unsigned char base_encode[MAX_HTTPS_PACKET_BUFFER];
     unsigned char base_dev_id[10];
-
+    char *json;
     struct gateway_op *message = message_queue_message_alloc_blocking(&https_queue);
     message->operation = OP_WRITE_HTTP;
     buf = malloc(MAX_HTTPS_PACKET_BUFFER);
 
+    // mode_addr to dev_id
+    memset(base_dev_id, 0x00, sizeof(dev_id));
+    char * dev_id = getDevIDFromDevices(modem_addr); 
+    base64_encode(dev_id, 3, base_dev_id);
+    LOG_DEBUG("DEV_ID %x %x %x : DEV_ID base64 encode : %s", dev_id, dev_id + 1, dev_id + 2, base_dev_id);
+    
     if (value != NULL) {
         memset(base_encode, 0x00, sizeof(base_encode));
         base64_encode(value, valuelen , base_encode);
-
-        // mode_addr to dev_id
-        memset(base_dev_id, 0x00, sizeof(dev_id));
-        char * dev_id = getDevIDFromDevices(modem_addr); 
-        base64_encode(dev_id, 3, base_dev_id);
-        LOG_DEBUG("DEV_ID %x %x %x : DEV_ID base64 encode : %s", dev_id, dev_id + 1, dev_id + 2, base_dev_id);
-
-        char *json = make_json(base_dev_id, base_encode);
-        if (ssl_server_ip == NULL) {
-            sprintf(buf, HTTPS_HEADER, url,  HTTPS_IP_ADDR, HTTPS_PORT_NUM, strlen(json) + 100, json);
-        } else {
-            sprintf(buf, HTTPS_HEADER, url,  ssl_server_ip, HTTPS_PORT_NUM, strlen(json) + 100, json);
-        }
+        json = make_json(base_dev_id, base_encode);
     } else {
-        if (ssl_server_ip == NULL) {
-            sprintf(buf, HTTPS_HEADER, url,  HTTPS_IP_ADDR, HTTPS_PORT_NUM, 100, "");
-        } else {
-            sprintf(buf, HTTPS_HEADER, url,  ssl_server_ip, HTTPS_PORT_NUM, 100, "");
-        }
+        json = make_json(base_dev_id, NULL);
+    }
+        
+    if (ssl_server_ip == NULL) {
+        sprintf(buf, HTTPS_HEADER, url,  HTTPS_IP_ADDR, HTTPS_PORT_NUM, strlen(json) + 100, json);
+    } else {
+        sprintf(buf, HTTPS_HEADER, url,  ssl_server_ip, HTTPS_PORT_NUM, strlen(json) + 100, json);
     }
 
     message->message_txt = buf;
     message->addr = modem_addr; //모뎀 어드레스
     message_queue_write(&https_queue, message);
 }
-
-
 
 void loadPacketNumber()
 {

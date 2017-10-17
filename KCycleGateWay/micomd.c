@@ -992,6 +992,10 @@ int packet_process(unsigned char * inputpacket, int addr)
             SSLServerSend("/gateway/raceCycleResultRequest", valuebuf, len, addr);
             break;
 
+            case PACKET_CMD_RACERESULT_END_R:
+            LOG_DEBUG("cmd PACKET_CMD_RACERESULT_END_R");
+            SSLServerSend("/gateway/raceResultEnd", valuebuf, len, addr);
+
             //건으로 부터 출발 신호를 받았다.
             case PACKET_CMD_RACESTART_GUN_R: 
             case PACKET_CMD_RACESTART_GUN2_R:
