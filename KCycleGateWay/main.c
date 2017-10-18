@@ -713,8 +713,6 @@ PairingInfo : [
                 is_uart_send = 0; //위에서 이미 전송 했음
 
             } else if (!strcmp(jobname, "raceResultReady")) {
-                
-                LOG_DEBUG("raceResultReady : %s\n", jobname);
                 char * value = from_json(jason_str, "DEV_ID");
                 base64_decode(value, strlen(value), base_decode);
 
@@ -739,7 +737,6 @@ PairingInfo : [
                 sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", addr, base_encode);
 
             } else if (!strcmp(jobname, "raceLineResultExtra")) {
-                LOG_DEBUG("raceLineResultExtra : %s\n", jobname);
                 char * value = from_json(jason_str, "DEV_ID");
                 
                 base64_decode(value, strlen(value), base_decode); //디바이스 아이디
@@ -747,7 +744,7 @@ PairingInfo : [
                 LOG_DEBUG("base64_decode after\n");
                 BIO_dump_fp(stdout, base_decode, strlen(base_decode));
                 int addr = getAddrFromDevices(base_decode);
-                LOG_DEBUG("addr %d\n",addr);
+                LOG_DEBUG("층 raceLineResultExtra: device_addr %d\n",addr);
 
                 memset(base_decode, 0x00 , sizeof(base_decode));
                 char * idexbytearray = from_json(jason_str, "INDEX");
@@ -758,8 +755,25 @@ PairingInfo : [
                 sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", addr, base_encode);
                 LOG_DEBUG("cmd_buffer[cmd_id] %s\n",cmd_buffer[cmd_id]);
 
+            } else if (!strcmp(jobname, "logRequest")) {
+                char * value = from_json(jason_str, "DEV_ID");
+                
+                base64_decode(value, strlen(value), base_decode); //디바이스 아이디
+                
+                LOG_DEBUG("base64_decode after\n");
+                BIO_dump_fp(stdout, base_decode, strlen(base_decode));
+                int addr = getAddrFromDevices(base_decode);
+                LOG_DEBUG("층 logRequest: device_addr %d\n",addr);
+
+                memset(base_decode, 0x00 , sizeof(base_decode));
+                char * index = from_json(jason_str, "Index"); // 1바이트 1 ~ 5
+
+                make_packet(PACKET_CMD_LOG_REQ_S, 0x00, addr, 1, index, outpacket, &outpacketlen);
+                base64_encode(outpacket, outpacketlen , base_encode);
+                sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", addr, base_encode);
+                LOG_DEBUG("cmd_buffer[cmd_id] %s\n",cmd_buffer[cmd_id]);
+
             } else if (!strcmp(jobname, "raceResultEnd")) {
-                LOG_DEBUG("raceResultEnd : %s\n", jobname);
                 char * value = from_json(jason_str, "DEV_ID");
                 
                 base64_decode(value, strlen(value), base_decode);
@@ -795,6 +809,11 @@ PairingInfo : [
             is_uart_send = 0;
         } else if (strcmp(res, "raceResultReady") == 0) { //패턴2
             // 응답 받고 처리 할께 없음
+            is_uart_send = 0;
+        }else if (strcmp(res, "logRequest") == 0) { //패턴2
+            // 응답 받고 처리 할께 없음
+            LOG_DEBUG("res logRequest");
+
             is_uart_send = 0;
         } else if (strcmp(res, "ping") == 0) {
             LOG_DEBUG("ping %s\n", res);
@@ -988,25 +1007,33 @@ void SSLServerSend(char *url, char *value, int valuelen, int modem_addr) {
     buf = malloc(MAX_HTTPS_PACKET_BUFFER);
 
     // mode_addr to dev_id
-    memset(base_dev_id, 0x00, sizeof(dev_id));
-    char * dev_id = getDevIDFromDevices(modem_addr); 
-    base64_encode(dev_id, 3, base_dev_id);
-    LOG_DEBUG("DEV_ID %x %x %x : DEV_ID base64 encode : %s", dev_id, dev_id + 1, dev_id + 2, base_dev_id);
-    
-    if (value != NULL) {
-        memset(base_encode, 0x00, sizeof(base_encode));
-        base64_encode(value, valuelen , base_encode);
-        json = make_json(base_dev_id, base_encode);
-    } else {
-        json = make_json(base_dev_id, NULL);
-    }
-        
-    if (ssl_server_ip == NULL) {
-        sprintf(buf, HTTPS_HEADER, url,  HTTPS_IP_ADDR, HTTPS_PORT_NUM, strlen(json) + 100, json);
-    } else {
-        sprintf(buf, HTTPS_HEADER, url,  ssl_server_ip, HTTPS_PORT_NUM, strlen(json) + 100, json);
-    }
+    if(modem_addr != -1 ) {
+        memset(base_dev_id, 0x00, sizeof(dev_id));
+        char * dev_id = getDevIDFromDevices(modem_addr); 
+        base64_encode(dev_id, 3, base_dev_id);
+        LOG_DEBUG("DEV_ID %x %x %x : DEV_ID base64 encode : %s", dev_id, dev_id + 1, dev_id + 2, base_dev_id);
 
+        if (value != NULL) {
+            memset(base_encode, 0x00, sizeof(base_encode));
+            base64_encode(value, valuelen , base_encode);
+            json = make_json(base_dev_id, base_encode);
+        } else {
+            json = make_json(base_dev_id, NULL);
+        }
+            
+        if (ssl_server_ip == NULL) {
+            sprintf(buf, HTTPS_HEADER, url,  HTTPS_IP_ADDR, HTTPS_PORT_NUM, strlen(json) + 100, json);
+        } else {
+            sprintf(buf, HTTPS_HEADER, url,  ssl_server_ip, HTTPS_PORT_NUM, strlen(json) + 100, json);
+        }
+    } else {
+        if (ssl_server_ip == NULL) {
+            sprintf(buf, HTTPS_HEADER, url,  HTTPS_IP_ADDR, HTTPS_PORT_NUM, 100, "");
+        } else {
+            sprintf(buf, HTTPS_HEADER, url,  ssl_server_ip, HTTPS_PORT_NUM, 100, "");
+        }
+
+    }
     message->message_txt = buf;
     message->addr = modem_addr; //모뎀 어드레스
     message_queue_write(&https_queue, message);

@@ -978,6 +978,12 @@ int packet_process(unsigned char * inputpacket, int addr)
             SSLServerSend("/gateway/raceLineResultExtra", valuebuf, len, addr);
             break;
 
+            case PACKET_CMD_LOG_REQ_R: //패턴2
+            LOG_DEBUG("cmd PACKET_CMD_LOG_REQ_R");
+            
+            SSLServerSend("/gateway/logRequest", valuebuf, len, addr);
+            break;
+
             case PACKET_CMD_RACELINERESULT_R:
             LOG_DEBUG("cmd PACKET_CMD_RACELINERESULT_R : len %d", len);
             
