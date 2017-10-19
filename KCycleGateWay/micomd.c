@@ -948,11 +948,11 @@ int packet_process(unsigned char * inputpacket, int addr)
             SSLServerSend("/gateway/raceStateCheck", valuebuf, len, addr);
             break;
 
-            case PACKET_CMD_RACESTART_R: //패턴2
-            LOG_DEBUG("cmd PACKET_CMD_RACESTART_R");
+            //case PACKET_CMD_RACESTART_R: //패턴2
+            // LOG_DEBUG("cmd PACKET_CMD_RACESTART_R");
         
-            SSLServerSend("/gateway/raceStart", valuebuf, len, addr);
-            break;
+            // SSLServerSend("/gateway/raceStart", valuebuf, len, addr);
+            //break;
 
             case PACKET_CMD_RACESTOP_R: //패턴2
             LOG_DEBUG("cmd PACKET_CMD_RACESTOP_R");
@@ -1029,13 +1029,10 @@ int packet_process(unsigned char * inputpacket, int addr)
             memset(base_encode, 0x00, sizeof(base_encode));
             outpacketlen = 0;
 
-            //건이 2가지 커맨드라서 code + 1로 응답 한다.
-            make_packet(code + 1, 0x00, addr, 0, NULL, outpacket, &outpacketlen);
-            base64_encode(outpacket, outpacketlen , base_encode);
-            sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", addr, base_encode);
-            LOG_DEBUG("cmd PACKET_CMD_RACESTART_GUN_R : cmdbuffer : %s", cmd_buffer[_AT_USER_CMD]);
-            ipc_send_flag = 1;
-            request_uart_send();
+
+            // 건에게답을 하지 않기로 2017.10.19
+            // 서버에게 raceStart 전송
+            SSLServerSend("/gateway/raceStart", valuebuf, len, -1);
             break;
 
             case PACKET_CMD_RACECYCLESULT_R:

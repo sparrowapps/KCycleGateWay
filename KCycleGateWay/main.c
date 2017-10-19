@@ -889,11 +889,11 @@ PairingInfo : [
             sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", modem_addr, base_encode);
 
         } else if (strcmp(res, "raceLineResult") == 0) {
-            make_packet(PACKET_CMD_RACELINERESULT_S, 0x00, modem_addr, 0, NULL, outpacket, &outpacketlen);
+            // make_packet(PACKET_CMD_RACELINERESULT_S, 0x00, modem_addr, 0, NULL, outpacket, &outpacketlen);
             
-            base64_encode(outpacket, outpacketlen , base_encode);
+            // base64_encode(outpacket, outpacketlen , base_encode);
 
-            sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", modem_addr, base_encode);
+            // sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", modem_addr, base_encode);
 
         } else if (strcmp(res, "raceEnd") == 0) { //레이스 종료 메세지 응답
             make_packet(PACKET_CMD_RACE_END_S, 0x00, modem_addr, 0, NULL, outpacket, &outpacketlen);
@@ -1267,6 +1267,9 @@ int main(int argc, char *argv[]) {
 
             if (server_sockfd) FD_SET(server_sockfd, &readfds);
             if (uart_fd) FD_SET(uart_fd, &readfds);
+
+            max_fd = uart_fd > server_sockfd ? uart_fd : server_sockfd;
+            max_fd = mk_fds(&readfds, max_fd);
             
             r = select(max_fd + 1, &readfds, (fd_set *)0, NULL, NULL);
 
