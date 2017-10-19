@@ -213,7 +213,8 @@ static void handle_socket_data(int fd) {
         }
     } else {
         socket_data[fd].state = SOCKET_INACTIVE;
-        close(fd);
+        //close(fd);
+        del_socket(fd);
     }
 }
 
