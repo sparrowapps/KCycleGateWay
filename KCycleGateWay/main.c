@@ -895,7 +895,9 @@ PairingInfo : [
             // base64_encode(outpacket, outpacketlen , base_encode);
 
             // sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", modem_addr, base_encode);
-
+            
+            // 응답 받고 처리 할께 없음
+            is_uart_send = 0;
         } else if (strcmp(res, "raceEnd") == 0) { //레이스 종료 메세지 응답
             make_packet(PACKET_CMD_RACE_END_S, 0x00, modem_addr, 0, NULL, outpacket, &outpacketlen);
             
