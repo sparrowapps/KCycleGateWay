@@ -234,9 +234,9 @@ typedef struct list_id {
 
 // GUN에서 출발 명령을 받으면 디바이스에게 PACKET_CMD_RACESTART_S 전송 하는 기능을 수행 한다.
 #define PACKET_CMD_RACESTART_GUN_R  0xA0
-//#define PACKET_CMD_RACESTART_GUN_S  0xA1    // 보내지 않기 서버에 raceStart 전송
+#define PACKET_CMD_RACESTART_GUN_S  0xA1    // 보내지 않기 서버에 raceStart 전송
 #define PACKET_CMD_RACESTART_GUN2_R  0xA2
-//#define PACKET_CMD_RACESTART_GUN2_S  0xA3   // 보내지 않기 서버에 raceStart 전송
+#define PACKET_CMD_RACESTART_GUN2_S  0xA3   // 보내지 않기 서버에 raceStart 전송
 
 
 #define PACKET_CMD_RACESTART_S      0x32
