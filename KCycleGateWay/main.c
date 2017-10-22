@@ -40,7 +40,7 @@ static void uart_write(int fd, char *msg);
 static void http_write( char *msg, int fd, int modem_addr);
 static json_t *load_json(const char *jason);
 static char * from_json(const char * json, char * key);
-
+static int getBase64DecodeSize(char * base64encode);
 // Message queue related code
 struct gateway_op {
     enum { OP_WRITE_UART, OP_WRITE_HTTP, OP_READ_SOCKET, OP_READ_UART, OP_EXIT } operation;
@@ -396,9 +396,10 @@ static void http_write( char *msg, int fd, int modem_addr) {
                 LOG_DEBUG("recJobNameevie : %s\n", jobname);
                 char * value = from_json(jason_str, "DEV_ID");
                 base64_decode(value, strlen(value), base_decode); //디바이스 아이디
+
                 
                 LOG_DEBUG("base64_decode after\n");
-                BIO_dump_fp(stdout, base_decode, BASE64_DECODE_OUT_SIZE(strlen(value)));
+                BIO_dump_fp(stdout, base_decode, getBase64DecodeSize(value));
                 int addr = getAddrFromDevices(base_decode);
                 LOG_DEBUG("addr %d\n",addr);
                 // ir test 0x02
@@ -743,7 +744,7 @@ PairingInfo : [
                 base64_decode(value, strlen(value), base_decode); //디바이스 아이디
                 
                 LOG_DEBUG("base64_decode after\n");
-                BIO_dump_fp(stdout, base_decode, BASE64_DECODE_OUT_SIZE(strlen(value)));
+                BIO_dump_fp(stdout, base_decode, getBase64DecodeSize(value));
                 int addr = getAddrFromDevices(base_decode);
                 LOG_DEBUG("층 raceLineResultExtra: device_addr %d\n",addr);
 
@@ -751,7 +752,7 @@ PairingInfo : [
                 char * idexbytearray = from_json(jason_str, "INDEX");
                 base64_decode(idexbytearray, strlen(idexbytearray), base_decode); //누락 인덱스 바이트 어레이
 
-                make_packet(PACKET_CMD_RACELINERESULT_EXTRA_S, 0x00, addr, BASE64_DECODE_OUT_SIZE(strlen(idexbytearray)), base_decode, outpacket, &outpacketlen);
+                make_packet(PACKET_CMD_RACELINERESULT_EXTRA_S, 0x00, addr, getBase64DecodeSize(idexbytearray), base_decode, outpacket, &outpacketlen);
                 base64_encode(outpacket, outpacketlen , base_encode);
                 sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", addr, base_encode);
                 LOG_DEBUG("cmd_buffer[cmd_id] %s\n",cmd_buffer[cmd_id]);
@@ -762,7 +763,7 @@ PairingInfo : [
                 base64_decode(value, strlen(value), base_decode); //디바이스 아이디
                 
                 LOG_DEBUG("base64_decode after\n");
-                BIO_dump_fp(stdout, base_decode, BASE64_DECODE_OUT_SIZE(strlen(value)));
+                BIO_dump_fp(stdout, base_decode, getBase64DecodeSize(value));
                 int addr = getAddrFromDevices(base_decode);
                 LOG_DEBUG("층 logRequest: device_addr %d\n",addr);
 
@@ -823,7 +824,7 @@ PairingInfo : [
             base64_decode(value, strlen(value), base_decode);
             LOG_DEBUG("value decode : %s\n", base_decode);
             
-            make_packet(PACKET_CMD_PING_S, 0x00, modem_addr, BASE64_DECODE_OUT_SIZE(strlen(value)), base_decode, outpacket, &outpacketlen);
+            make_packet(PACKET_CMD_PING_S, 0x00, modem_addr, getBase64DecodeSize(value), base_decode, outpacket, &outpacketlen);
             
             LOG_DEBUG("vbase64_encode");
             base64_encode(outpacket, outpacketlen , base_encode);
@@ -843,7 +844,7 @@ PairingInfo : [
             char * value = from_json(jason_str, "Value");
             base64_decode(value, strlen(value), base_decode);
 
-            make_packet(PACKET_CMD_ENCKEY_REQ_S, 0x00, modem_addr, BASE64_DECODE_OUT_SIZE(strlen(value)), base_decode, outpacket, &outpacketlen);
+            make_packet(PACKET_CMD_ENCKEY_REQ_S, 0x00, modem_addr, getBase64DecodeSize(value), base_decode, outpacket, &outpacketlen);
             
             base64_encode(outpacket, outpacketlen , base_encode);
 
@@ -851,14 +852,14 @@ PairingInfo : [
 
             //encrypt key update
             LOG_DEBUG("date + AES192 key\n");
-            BIO_dump_fp(stdout, base_decode, BASE64_DECODE_OUT_SIZE(strlen(value)));
+            BIO_dump_fp(stdout, base_decode, getBase64DecodeSize(value));
             memcpy(Key, base_decode + 5, CRL_AES192_KEY); //24 byte key update
 
         } else if (strcmp(res, "logCheckMessage") == 0) {
             char * value = from_json(jason_str, "Value");
             base64_decode(value, strlen(value), base_decode);
 
-            make_packet(PACKET_CMD_LOGCHK_S, 0x00, modem_addr, BASE64_DECODE_OUT_SIZE(strlen(value)), base_decode, outpacket, &outpacketlen);
+            make_packet(PACKET_CMD_LOGCHK_S, 0x00, modem_addr, getBase64DecodeSize(value), base_decode, outpacket, &outpacketlen);
             
             base64_encode(outpacket, outpacketlen , base_encode);
 
@@ -883,7 +884,7 @@ PairingInfo : [
             char * value = from_json(jason_str, "Value");
             base64_decode(value, strlen(value), base_decode);
 
-            make_packet(PACKET_CMD_RACESTATECHK_S, 0x00, modem_addr, BASE64_DECODE_OUT_SIZE(strlen(value)), base_decode, outpacket, &outpacketlen);
+            make_packet(PACKET_CMD_RACESTATECHK_S, 0x00, modem_addr, getBase64DecodeSize(value), base_decode, outpacket, &outpacketlen);
             
             base64_encode(outpacket, outpacketlen , base_encode);
 
@@ -1187,6 +1188,25 @@ void request_uart_send()
     LOG_DEBUG("UART SEND TEXT : %s ", buf);
     message_queue_write(&uart_w_queue, message);
     ipc_send_flag = 0;
+}
+
+int getBase64DecodeSize(char * base64encode)
+{
+    int len = strlen(base64encode);
+    int minuscnt = 0;
+    if (len >= 4) {
+        if (base64encode[len - 1] == '=' && base64encode[len - 2] == '='){
+            minuscnt = 2;
+        } else if (base64encode[len - 1] == '=') {
+            minuscnt = 1;
+        } else {
+            minuscnt = 0;
+        }
+    } else {
+        LOG_DEBUG("invalid input base64 encode str");
+        return -1;
+    }
+    return (BASE64_DECODE_OUT_SIZE(len) - minuscnt);
 }
 
 int main(int argc, char *argv[]) {
