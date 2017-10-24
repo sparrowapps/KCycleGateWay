@@ -30,6 +30,7 @@ Description :
 #include "logger.h"
 #include "base64.h"
 #include <jansson.h>
+#include <netinet/tcp.h>
 #include "crc.h"
 // function prototype
 static void handle_uart_data(int fd);
@@ -213,7 +214,7 @@ static void handle_socket_data(int fd) {
         }
     } else {
         socket_data[fd].state = SOCKET_INACTIVE;
-        //close(fd);
+
         del_socket(fd);
     }
 }
@@ -226,16 +227,15 @@ static void handle_socket_request(int fd, char *request) {
         char * code = strstr(request, "YouHaveAJob") + strlen("YouHaveAJob");
         LOG_DEBUG("%s\n", request);
 
-        write(fd,"OK\0",4); //ok 응답
+        int flag = 1;
+        setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int));
+        write(fd,"OK\r\n",4); //ok 응답
         
-        close(fd);
-        del_socket(fd);
 
         sprintf(sslUrlBuf,"/gateway/whatIsMyJob?%s", code);
         LOG_DEBUG("%s\n", sslUrlBuf);
         SSLServerSend(sslUrlBuf, NULL, 0, -1);
     } else {
-        close(fd);
         del_socket(fd);
     }
 }
@@ -385,18 +385,24 @@ static void http_write( char *msg, int fd, int modem_addr) {
         BIO_dump_fp(stdout, jason_str, strlen(jason_str));
 
         char * res = from_json(jason_str, "Result");
+        if (res == NULL)
+            return;
 
         // whatIsMyJob 처리
         if (!strcmp(res, "whatIsMyJob")) { // 패턴2
             LOG_DEBUG("recevie : whatIsMyJob\n");
             ///gateway/whatIsMyJob 응답 처리 JobName으로 다시 분기 하여 처리 한다.            
             char * jobname = from_json(jason_str, "JobName");
+            if (jobname == NULL)
+                return;
             
             if (!strcmp(jobname, "Inspect IR")) {
                 LOG_DEBUG("recJobNameevie : %s\n", jobname);
                 char * value = from_json(jason_str, "DEV_ID");
-                base64_decode(value, strlen(value), base_decode); //디바이스 아이디
+                if (value == NULL)
+                    return;
 
+                base64_decode(value, strlen(value), base_decode); //디바이스 아이디
                 
                 LOG_DEBUG("base64_decode after\n");
                 BIO_dump_fp(stdout, base_decode, getBase64DecodeSize(value));
@@ -412,6 +418,9 @@ static void http_write( char *msg, int fd, int modem_addr) {
             } else if (!strcmp(jobname, "Inspect Wheel")) {
                 LOG_DEBUG("recJobNameevie : %s\n", jobname);
                 char * value = from_json(jason_str, "DEV_ID");
+                if (value == NULL)
+                    return;
+
                 base64_decode(value, strlen(value), base_decode);
 
                 int addr = getAddrFromDevices(base_decode);
@@ -716,6 +725,9 @@ PairingInfo : [
 
             } else if (!strcmp(jobname, "raceResultReady")) {
                 char * value = from_json(jason_str, "DEV_ID");
+                if (value == NULL)
+                    return;
+
                 base64_decode(value, strlen(value), base_decode);
 
                 int addr = getAddrFromDevices(base_decode);
@@ -729,6 +741,8 @@ PairingInfo : [
 
             } else if (!strcmp(jobname, "raceCycleResultRequest")) {
                 char * value = from_json(jason_str, "DEV_ID");
+                if (value == NULL)
+                    return;
 
                 base64_decode(value, strlen(value), base_decode);
                 int addr = getAddrFromDevices(base_decode);
@@ -740,7 +754,9 @@ PairingInfo : [
 
             } else if (!strcmp(jobname, "raceLineResultExtra")) {
                 char * value = from_json(jason_str, "DEV_ID");
-                
+                if (value == NULL)
+                    return;
+
                 base64_decode(value, strlen(value), base_decode); //디바이스 아이디
                 
                 LOG_DEBUG("base64_decode after\n");
@@ -750,6 +766,9 @@ PairingInfo : [
 
                 memset(base_decode, 0x00 , sizeof(base_decode));
                 char * idexbytearray = from_json(jason_str, "INDEX");
+                if (idexbytearray == NULL)
+                    return;
+                    
                 base64_decode(idexbytearray, strlen(idexbytearray), base_decode); //누락 인덱스 바이트 어레이
 
                 make_packet(PACKET_CMD_RACELINERESULT_EXTRA_S, 0x00, addr, getBase64DecodeSize(idexbytearray), base_decode, outpacket, &outpacketlen);
@@ -759,7 +778,9 @@ PairingInfo : [
 
             } else if (!strcmp(jobname, "logRequest")) {
                 char * value = from_json(jason_str, "DEV_ID");
-                
+                if (value == NULL)
+                    return;
+
                 base64_decode(value, strlen(value), base_decode); //디바이스 아이디
                 
                 LOG_DEBUG("base64_decode after\n");
@@ -769,6 +790,8 @@ PairingInfo : [
 
                 memset(base_decode, 0x00 , sizeof(base_decode));
                 char * index = from_json(jason_str, "Index"); // 1바이트 1 ~ 5
+                if (index == NULL)
+                    return;
 
                 make_packet(PACKET_CMD_LOG_REQ_S, 0x00, addr, 1, index, outpacket, &outpacketlen);
                 base64_encode(outpacket, outpacketlen , base_encode);
@@ -777,6 +800,8 @@ PairingInfo : [
 
             } else if (!strcmp(jobname, "raceResultEnd")) {
                 char * value = from_json(jason_str, "DEV_ID");
+                if (value == NULL)
+                    return;
                 
                 base64_decode(value, strlen(value), base_decode);
                 int addr = getAddrFromDevices(base_decode);
@@ -820,6 +845,9 @@ PairingInfo : [
         } else if (strcmp(res, "ping") == 0) {
             LOG_DEBUG("ping %s\n", res);
             char * value = from_json(jason_str, "Value");
+            if (value == NULL)
+                return;
+
             LOG_DEBUG("value %s\n", value);
             base64_decode(value, strlen(value), base_decode);
             LOG_DEBUG("value decode : %s\n", base_decode);
@@ -842,6 +870,9 @@ PairingInfo : [
 
         } else if (strcmp(res, "encryptionKeyRequest") == 0) {
             char * value = from_json(jason_str, "Value");
+            if (value == NULL)
+                return;
+
             base64_decode(value, strlen(value), base_decode);
 
             make_packet(PACKET_CMD_ENCKEY_REQ_S, 0x00, modem_addr, getBase64DecodeSize(value), base_decode, outpacket, &outpacketlen);
@@ -857,6 +888,9 @@ PairingInfo : [
 
         } else if (strcmp(res, "logCheckMessage") == 0) {
             char * value = from_json(jason_str, "Value");
+            if (value == NULL)
+                return;
+
             base64_decode(value, strlen(value), base_decode);
 
             make_packet(PACKET_CMD_LOGCHK_S, 0x00, modem_addr, getBase64DecodeSize(value), base_decode, outpacket, &outpacketlen);
@@ -882,6 +916,9 @@ PairingInfo : [
 
         } else if (strcmp(res, "raceStateCheck") == 0) {
             char * value = from_json(jason_str, "Value");
+            if (value == NULL)
+                return;
+
             base64_decode(value, strlen(value), base_decode);
 
             make_packet(PACKET_CMD_RACESTATECHK_S, 0x00, modem_addr, getBase64DecodeSize(value), base_decode, outpacket, &outpacketlen);
@@ -981,7 +1018,7 @@ json_t *load_json(const char *jason) {
         return root;
     } else {
         LOG_DEBUG("json error on line %d: %s\n", error.line, error.text);
-        return (json_t *)0;
+        return (json_t *)NULL;
     }
 }
 
@@ -990,8 +1027,12 @@ char * from_json(const char * json, char * key)
     char * res;
     json_t * root = load_json(json);
     
-    json_unpack(root, "{s:s}", key, &res);
-    return res;
+    if (root != NULL ) {
+        json_unpack(root, "{s:s}", key, &res);
+        return res;
+    } else {
+        return NULL;
+    }
 }
 
 
