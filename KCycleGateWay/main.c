@@ -251,7 +251,7 @@ struct uart_state uart_data[FD_SETSIZE];
 
 
 // uart 에서 데이터를 읽는 다.
-// read_packet() 함수를 사용 하지 않는다.
+// read_packet() 함수를 사용 하지 않는다
 static void handle_uart_data(int fd) {
     int r;
     do {
@@ -1345,7 +1345,7 @@ int main(int argc, char *argv[]) {
                 
                 if (FD_ISSET(uart_fd, &readfds)) {
                     uart_data[uart_fd].state = UART_READING;
-                    //uart_data[uart_fd].pos = 0;
+                    uart_data[uart_fd].pos = 0;
                     
                     struct gateway_op *message = message_queue_message_alloc_blocking(&uart_r_queue);
                     message->operation = OP_READ_UART;
