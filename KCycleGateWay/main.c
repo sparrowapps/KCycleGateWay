@@ -254,15 +254,30 @@ struct uart_state uart_data[FD_SETSIZE];
 // read_packet() 함수를 사용 하지 않는다
 static void handle_uart_data(int fd) {
     int r;
-    do {
-    r = read(fd, uart_data[fd].buf + uart_data[fd].pos, 1024 - uart_data[fd].pos);
+
+    if((r = read(fd, uart_data[fd].buf + uart_data[fd].pos, MAX_PACKET_BYTE)) > 0) {
+        
         uart_data[fd].pos += r;
-    }while( r == -1 );
 
-    uart_data[fd].state = UART_INACTIVE;
+        if (uart_data[fd].pos > MAX_PACKET_BYTE) { // wrong packet 
+            uart_data[fd].pos = 0;
+            memset(uart_data[fd].buf, 0x00, sizeof (uart_data[fd].buf));
+            return;
+        }
 
-    handle_uart_request(fd, uart_data[fd].buf);
+        if(uart_data[fd].pos >= 2 ) {
+            uart_data[fd].buf[uart_data[fd].pos] = '\0';
+            uart_data[fd].state = UART_INACTIVE;
+            // 수신데이터 처리
+            handle_uart_request(fd, uart_data[fd].buf);
+            return;
+        }
+    } else {
+        uart_data[fd].state = UART_INACTIVE;
+        
+    }
 }
+
 
 static void handle_uart_request(int fd, char *request) {
     // parse and cmd process
