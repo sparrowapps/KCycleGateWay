@@ -1003,6 +1003,11 @@ int packet_process(unsigned char * inputpacket, int addr)
             SSLServerSend("/gateway/raceResultEnd", valuebuf, len, addr);
             break;
 
+            case PACKET_CMD_IR_REF_SET_R:
+            LOG_DEBUG("cmd PACKET_CMD_IR_REF_SET_R");
+            SSLServerSend("/gateway/irReferenceSet", valuebuf, len, addr);
+            break;
+
             //건으로 부터 출발 신호를 받았다.
             case PACKET_CMD_RACESTART_GUN_R: 
             case PACKET_CMD_RACESTART_GUN2_R:

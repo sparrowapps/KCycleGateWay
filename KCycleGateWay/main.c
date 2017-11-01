@@ -445,17 +445,17 @@ static void http_write( char *msg, int fd, int modem_addr) {
                 base64_encode(outpacket, outpacketlen , base_encode);
                 sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", addr, base_encode);    
             } else if ( !strcmp(jobname, "pairingInfo1") || !strcmp(jobname, "pairingInfo2") || !strcmp(jobname, "pairingInfo3") )  { //pairingInfo
-/*
-GRP_ID : base64(3)
-CHN : 숫자값
-BAND : 숫자값
-DRATE : 숫자값
-COUNT : 숫자값
-PairingInfo : [
-    DEV_ID : base64(3) 
-    DEV_ADDR : 숫자값
-]
-*/
+                /*
+                GRP_ID : base64(3)
+                CHN : 숫자값
+                BAND : 숫자값
+                DRATE : 숫자값
+                COUNT : 숫자값
+                PairingInfo : [
+                    DEV_ID : base64(3) 
+                    DEV_ADDR : 숫자값
+                ]
+                */
                 json_t *root;
                 json_error_t error;
                 char  *grp_id;
@@ -689,27 +689,27 @@ PairingInfo : [
                 // 레이스 디바이스 리스트 확보
                 make_racer_addr(jason_str);
 
-#if 0 //건이 없어서.. 걍 쏜다.
-                for (int i = 0; i< racer_count; i++ ) { // 경기 참여 디바이스에 RACE sTART 전송
-                    memset(outpacket, 0x00, sizeof(outpacket));
-                    memset(base_encode, 0x00, sizeof(base_encode));
-                    outpacketlen = 0;
+                #if 0 //건이 없어서.. 걍 쏜다.
+                    for (int i = 0; i< racer_count; i++ ) { // 경기 참여 디바이스에 RACE sTART 전송
+                        memset(outpacket, 0x00, sizeof(outpacket));
+                        memset(base_encode, 0x00, sizeof(base_encode));
+                        outpacketlen = 0;
 
-                    make_packet(PACKET_CMD_RACESTART_S, 0x00, racer_addr[i], 0, NULL, outpacket, &outpacketlen);
-                    base64_encode(outpacket, outpacketlen , base_encode);
-                    sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", racer_addr[i], base_encode);
-                    LOG_DEBUG("cmd PACKET_CMD_RACESTART_GUN_R : cmdbuffer : %s", cmd_buffer[_AT_USER_CMD]);
-                    
-                    request_uart_send();
-                }
-                is_uart_send = 0;
-#endif
+                        make_packet(PACKET_CMD_RACESTART_S, 0x00, racer_addr[i], 0, NULL, outpacket, &outpacketlen);
+                        base64_encode(outpacket, outpacketlen , base_encode);
+                        sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", racer_addr[i], base_encode);
+                        LOG_DEBUG("cmd PACKET_CMD_RACESTART_GUN_R : cmdbuffer : %s", cmd_buffer[_AT_USER_CMD]);
+                        
+                        request_uart_send();
+                    }
+                    is_uart_send = 0;
+                #endif
             } else if (!strcmp(jobname, "raceStartGun")) { //테스트 건이 없어서
                 // 레이스 디바이스 리스트 확보
                 make_racer_addr(jason_str);
                 LOG_DEBUG("RraceStartGun RACER COUNT : %d", racer_count);
 
-#if 1 //건이 없어서.. 걍 쏜다.
+                #if 1 //건이 없어서.. 걍 쏜다.
                 for (int i = 0; i< racer_count; i++ ) { // 경기 참여 디바이스에 RACE sTART 전송
                     memset(outpacket, 0x00, sizeof(outpacket));
                     memset(base_encode, 0x00, sizeof(base_encode));
@@ -723,7 +723,7 @@ PairingInfo : [
                     request_uart_send();
                 }
                 is_uart_send = 0;
-#endif
+                #endif
             } else if (!strcmp(jobname, "raceStop")) {
                 
                 make_racer_addr(jason_str);
@@ -801,7 +801,7 @@ PairingInfo : [
                 LOG_DEBUG("base64_decode after\n");
                 BIO_dump_fp(stdout, base_decode, getBase64DecodeSize(value));
                 int addr = getAddrFromDevices(base_decode);
-                LOG_DEBUG("층 logRequest: device_addr %d\n",addr);
+                LOG_DEBUG("cmd logRequest: device_addr %d\n",addr);
 
                 memset(base_decode, 0x00 , sizeof(base_decode));
                 char * index = from_json(jason_str, "Index"); // 1바이트 1 ~ 5
@@ -826,6 +826,30 @@ PairingInfo : [
                 base64_encode(outpacket, outpacketlen , base_encode);
                 sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", addr, base_encode);
 
+            } else if (!strcmp(jobname, "irReferenceSet")) {
+                char * value = from_json(jason_str, "DEV_ID");
+                if (value == NULL)
+                    return;
+                
+                base64_decode(value, strlen(value), base_decode); //디바이스 아이디
+                
+                LOG_DEBUG("base64_decode after\n");
+                BIO_dump_fp(stdout, base_decode, getBase64DecodeSize(value));
+                int addr = getAddrFromDevices(base_decode);
+                LOG_DEBUG("cmd irReferenceSet: device_addr %d\n",addr);
+
+                memset(base_decode, 0x00 , sizeof(base_decode));
+                char * idexbytearray = from_json(jason_str, "IrReferenceSet");
+                if (idexbytearray == NULL)
+                    return;
+                    
+                base64_decode(idexbytearray, strlen(idexbytearray), base_decode); 
+
+                make_packet(PACKET_CMD_IR_REF_SET_S, 0x00, addr, getBase64DecodeSize(idexbytearray), base_decode, outpacket, &outpacketlen);
+                base64_encode(outpacket, outpacketlen , base_encode);
+                sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", addr, base_encode);
+                LOG_DEBUG("cmd_buffer[cmd_id] %s\n",cmd_buffer[cmd_id]);
+                
             } else {
                 // json 파싱 종료
                 is_uart_send = 0;

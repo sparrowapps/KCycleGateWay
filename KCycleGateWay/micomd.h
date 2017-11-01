@@ -271,6 +271,9 @@ typedef struct list_id {
 #define PACKET_CMD_LOG_REQ_S   0x50
 #define PACKET_CMD_LOG_REQ_R   0x51
 
+#define PACKET_CMD_IR_REF_SET_S  0x52
+#define PACKET_CMD_IR_REF_SET_R  0x53
+
 #define RST 9
 #define PIO 7
 
