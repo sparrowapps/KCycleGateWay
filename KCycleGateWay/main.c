@@ -1,4 +1,4 @@
-/*
+    /*
 ============================================================================
 Name        : main.c
 Author      : sparrow
@@ -1384,7 +1384,6 @@ int main(int argc, char *argv[]) {
                 
                 if (FD_ISSET(uart_fd, &readfds)) {
                     uart_data[uart_fd].state = UART_READING;
-                    uart_data[uart_fd].pos = 0;
                     
                     struct gateway_op *message = message_queue_message_alloc_blocking(&uart_r_queue);
                     message->operation = OP_READ_UART;
