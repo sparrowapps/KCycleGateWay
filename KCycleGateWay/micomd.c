@@ -131,7 +131,7 @@ BYTE cmd_buffer[MAX_CMD][MAX_PACKET_BUFFER] =
     "AT+GRP_ID?\r\n",                   // 15
     "AT+MADD?\r\n",                     // 16
     "AT+DEL_AID=1\r\n",                 // 17
-    "AT+ACK_EN=1\r\n",                  // 18
+    "AT+ACK_EN=0\r\n",                  // 18
     "",
 };
 

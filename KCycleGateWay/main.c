@@ -1,4 +1,4 @@
-    /*
+/*
 ============================================================================
 Name        : main.c
 Author      : sparrow
@@ -361,7 +361,6 @@ static void make_racer_addr(char * jason_str)
     }
 }
 
-
 /*
     SSL write 후 응담을 uart로 쏴야 할경우 여기서 처리 해야 한다.
 */
@@ -489,7 +488,6 @@ static void http_write( char *msg, int fd, int modem_addr) {
                 LOG_DEBUG("COUNT : %d", count);
                 LOG_DEBUG("HOST : %d", host);
                 //AT command parameter update
-                
 
                 if ( !strcmp(jobname, "pairingInfo1") ) {
                     sprintf(cmd_buffer[_AT_GRP_ID], AT_GRP_ID_FMT, decode_grp_id[0], decode_grp_id[1], decode_grp_id[2]);
@@ -617,6 +615,8 @@ static void http_write( char *msg, int fd, int modem_addr) {
                     devices[i].dev_id[2],
                     devices[i].dev_addr );
                 }
+                is_uart_send = 0; 
+
             }else if (!strcmp(jobname, "deletePairingInfo")) {
                 manaual_pairinig_status = _MANUAL_PAIRING_DELETE;
                 
@@ -1074,7 +1074,6 @@ char * from_json(const char * json, char * key)
     }
 }
 
-
 /*
 url , 전달 데이터를 주면 서버에 
 SSL request JSON을 포함해서 전송 한다.
@@ -1116,7 +1115,6 @@ void SSLServerSend(char *url, char *value, int valuelen, int modem_addr) {
         } else {
             sprintf(buf, HTTPS_HEADER, url,  ssl_server_ip, HTTPS_PORT_NUM, 100, "");
         }
-
     }
     message->message_txt = buf;
     message->addr = modem_addr; //모뎀 어드레스
@@ -1158,7 +1156,6 @@ void savePacketNumber()
     }
     fprintf(fp, "%d\n", gatewayPacketNumber);
     fclose(fp);
-
 }
 
 static void sig_handler(int signal) {
@@ -1290,30 +1287,6 @@ int getBase64DecodeSize(char * base64encode)
 }
 
 int main(int argc, char *argv[]) {
-
-#if 0
-    jsonTest();
-    return 0;
-#endif
-
-#if 0
-    unsigned char base_encode[MAX_PACKET_BUFFER];
-    unsigned char base_decode[MAX_PACKET_BUFFER];
-    memset(base_encode, 0x00, sizeof(base_encode));
-    memset(base_decode, 0x00, sizeof(base_decode));
-    char buf[4] = {0x69, 0xcf, 0x38, 0x00};
-    base64_encode(buf, 4, base_encode);
-    LOG_DEBUG("base 64 : %s   %d ", base_encode, strlen(base_encode));
-
-    base64_decode("ac84AA==", 8,  base_decode);
-    LOG_DEBUG("%02x %02x %02x %02x : %s", base_decode[0],base_decode[1],base_decode[2],base_decode[3], base_decode);
-
-    base64_decode("acOPOA==", 8,  base_decode);
-    LOG_DEBUG("%02x %02x %02x %02x : %s", base_decode[0],base_decode[1],base_decode[2],base_decode[3], base_decode);
-
-    return 0;
-#endif
-
     signal(SIGINT, (void *)sig_handler);
 
     if ( argc == 2 ) {
@@ -1324,15 +1297,6 @@ int main(int argc, char *argv[]) {
     }
 
     loadPacketNumber();
-
-    #if 0
-    short crc = crc16("123456789", 9);
-    char a[2];
-    a[0] = crc % 256;
-    a[1] = crc / 256;
-    LOG_DEBUG("%x %x",a[0],a[1]);
-    return 0;
-    #endif
 
     main_thread = pthread_self();
     threads_init();
@@ -1440,4 +1404,3 @@ int main(int argc, char *argv[]) {
         perror("Error listening on uart or socket");
     }
 }
-
