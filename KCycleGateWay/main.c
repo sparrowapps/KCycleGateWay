@@ -1095,7 +1095,7 @@ void SSLServerSend(char *url, char *value, int valuelen, int modem_addr) {
 
     // mode_addr to dev_id
     if(modem_addr != -1 ) {
-        memset(base_dev_id, 0x00, sizeof(dev_id));
+        memset(base_dev_id, 0x00, sizeof(base_dev_id));
         char * dev_id = getDevIDFromDevices(modem_addr); 
         base64_encode(dev_id, 3, base_dev_id);
         LOG_DEBUG("DEV_ID %x %x %x : DEV_ID base64 encode : %s : addr: %d", *(dev_id), *(dev_id + 1), *(dev_id + 2), base_dev_id, modem_addr);
