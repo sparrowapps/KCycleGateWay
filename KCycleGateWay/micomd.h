@@ -53,6 +53,9 @@ typedef signed long int        INT32;
 #define MAX_RACERS              9 //경기당 최대 선수
 #define RACE_RESULT_PACKET_SIZE (4*35)
 
+//건은 CRC 무시를 한다.
+#define GUN_ID                   (190)
+
 #define HTTP_MSG_WHATISMYJOB    "GET /gateway/whatismyjob?jobno=%s HTTP/1.1\n\
 Host: %s:%s\n\
 Connection: keep-alive\n\
@@ -318,7 +321,15 @@ void make_ac_code(char * senderid, short pn, unsigned char * out_ac);
 char * hexbuf2buf(const char * hexbuf);
 int hex2val(const char ch);
 
-int extract_packet (unsigned char * inputpacket, char * outcode, char * outsubcode, char * outsenderid, short * outpn, char * outlen, unsigned char * outvalue);
+int extract_packet (unsigned char * inputpacket, 
+    char * outcode, 
+    char * outsubcode, 
+    char * outsenderid, 
+    short * outpn, 
+    char * outlen, 
+    unsigned char * outvalue,
+    int addr);
+    
 int packet_process(unsigned char * inputpacket, int addr);
 
 int getAddrFromDevices(char * dev_id);

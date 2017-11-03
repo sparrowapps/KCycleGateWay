@@ -775,7 +775,7 @@ int check_uart (PBYTE data_buf)
     {
         LOG_DEBUG("MADD : %s", data_buf);
 
-    #if 0
+    #if 1
         cmd_id = _AT_LST_ID; // 리스트 얻기 제거됨
     #else 
         // 리셋
@@ -862,8 +862,8 @@ int packet_process(unsigned char * inputpacket, int addr)
     memset(base_encode, 0x00, sizeof(base_encode));
 
     // 내아이디 얻기를 해야 함
-    LOG_DEBUG("bextract_packet\n"); 
-    if ( extract_packet(inputpacket, &code, &subcode, dev_id, &pn, &len, valuebuf) == 0 ){
+    LOG_DEBUG("extract_packet\n"); 
+    if ( extract_packet(inputpacket, &code, &subcode, dev_id, &pn, &len, valuebuf, addr) == 0 ){
         //패킷 넘버 확인
 #if 0        
         if (pn < packetnumberArray[addr]) {
@@ -1100,7 +1100,7 @@ int packet_process(unsigned char * inputpacket, int addr)
                 memcpy(race_res_buf[idx] + race_res_offset[idx], valuebuf, RACE_RESULT_PACKET_SIZE);
                 
             }
-            usleep(1000 * 100);
+            usleep(1000 * 50);
             request_uart_send();
             break;
                 
@@ -1123,7 +1123,8 @@ int extract_packet (unsigned char * inputpacket,
                     char * outsenderid, 
                     short * outpn, 
                     char * outlen, 
-                    unsigned char * outvalue)
+                    unsigned char * outvalue,
+                    int addr)
 {
     unsigned char dec_out[1000];
 
@@ -1138,13 +1139,16 @@ int extract_packet (unsigned char * inputpacket,
     *outpn = (short)inputpacket[5] + (short)(inputpacket[6] << 8);
     *outlen = *(inputpacket + 12);
 
+    if ( addr !=  GUN_ID ) {
     short orgcrc ;
     memcpy(&orgcrc, (void *)(inputpacket + 13 + *outlen), 2);
 
-    short crc = crc16(inputpacket, 13 + *outlen );
-    if (orgcrc != crc ) {
-        LOG_DEBUG("CRC error RCRC :%04x  G CRC:%04x", orgcrc, crc);
-        return -1;
+    
+        short crc = crc16(inputpacket, 13 + *outlen );
+        if (orgcrc != crc ) {
+            LOG_DEBUG("CRC error RCRC :%04x  G CRC:%04x", orgcrc, crc);
+            return -1;
+        }
     }   
     
     if (validate_ac(inputpacket + 2, *outpn, inputpacket + 2) == 0){
@@ -1408,6 +1412,7 @@ char * getDevIDFromDevices(int dev_addr)
             return devices[i].dev_id;
         }
     }
+    LOG_DEBUG("ERROR not found getDevIDFromDevices");
     return NULL;
 }
 

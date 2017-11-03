@@ -230,7 +230,9 @@ static void handle_socket_request(int fd, char *request) {
         int flag = 1;
         setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int));
         write(fd,"OK\r\n",4); //ok 응답
-        
+
+        //소켓 제거
+        del_socket(fd);
 
         sprintf(sslUrlBuf,"/gateway/whatIsMyJob?%s", code);
         LOG_DEBUG("%s\n", sslUrlBuf);
@@ -808,7 +810,9 @@ static void http_write( char *msg, int fd, int modem_addr) {
                 if (index == NULL)
                     return;
 
-                make_packet(PACKET_CMD_LOG_REQ_S, 0x00, addr, 1, index, outpacket, &outpacketlen);
+                char indexChar = index[0] - 0x31;    
+
+                make_packet(PACKET_CMD_LOG_REQ_S, 0x00, addr, 1, indexChar, outpacket, &outpacketlen);
                 base64_encode(outpacket, outpacketlen , base_encode);
                 sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", addr, base_encode);
                 LOG_DEBUG("cmd_buffer[cmd_id] %s\n",cmd_buffer[cmd_id]);
@@ -1094,7 +1098,7 @@ void SSLServerSend(char *url, char *value, int valuelen, int modem_addr) {
         memset(base_dev_id, 0x00, sizeof(dev_id));
         char * dev_id = getDevIDFromDevices(modem_addr); 
         base64_encode(dev_id, 3, base_dev_id);
-        LOG_DEBUG("DEV_ID %x %x %x : DEV_ID base64 encode : %s", dev_id, dev_id + 1, dev_id + 2, base_dev_id);
+        LOG_DEBUG("DEV_ID %x %x %x : DEV_ID base64 encode : %s : addr: %d", *(dev_id), *(dev_id + 1), *(dev_id + 2), base_dev_id, modem_addr);
 
         if (value != NULL) {
             memset(base_encode, 0x00, sizeof(base_encode));
@@ -1164,90 +1168,6 @@ static void sig_handler(int signal) {
     LOG_DEBUG("Save PacketNumber End!\n");
     threads_destroy();
     exit(0);
-}
-
-//
-#define JSONSTR "{\"GRP_ID\":\"ac84AA==\", \"CHN\":5, \"BAND\":3, \"DRATE\":2, \"COUNT\":2, \"PairingInfo\":[{\"DEV_ADDR\":5,\"DEV_ID\":\"ac84AA==\"}, {\"DEV_ADDR\":5,\"DEV_ID\":\"ac84AA==\"}, {\"DEV_ADDR\":2,\"DEV_ID\":\"ac84AA==\"}]}"
-
-void jsonTest()
-{
-    json_t *root;
-    json_error_t error;
-    char  *grp_id;
-    int chn;
-    int band;
-    int drate;
-    int count;
-    char decode_grp_id[10] = {0,};
-    
-    json_t *pairinginfo = NULL;
-
-    LOG_DEBUG("%s", JSONSTR);
-
-    root = json_loads(JSONSTR, 0, &error);
-    
-    json_unpack(root, "{s:s, s:i, s:i, s:i, s:i }", 
-        "GRP_ID", &grp_id, 
-        "CHN", &chn, 
-        "BAND", &band, 
-        "DRATE", &drate, 
-        "COUNT", &count 
-    );
-
-    LOG_DEBUG("GRP_ID : %s  :  %d", grp_id, strlen(grp_id));
-
-    base64_decode(grp_id, strlen(grp_id) , decode_grp_id);
-
-    LOG_DEBUG("GRP_ID : %02x %02x %02x", decode_grp_id[0], decode_grp_id[1], decode_grp_id[2]);
-    LOG_DEBUG("CHN : %d", chn);
-    LOG_DEBUG("BAND : %d", band);
-    LOG_DEBUG("DRATE : %d", drate);
-    LOG_DEBUG("COUNT : %d", count);
-
-    pairinginfo = json_object_get(root, "PairingInfo");
-
-    LOG_DEBUG("COUNT : %d", json_array_size(pairinginfo));
-    for (int i = 0; i < json_array_size(pairinginfo); i++)
-    {
-        json_t *data, *dev_id, *dev_addr;
-        const char * dev_id_str;
-        int dev_addr_val;
-        char decode_dev_id[10] = {0,};
-        data = json_array_get(pairinginfo, i);
-        if(!json_is_object(data))
-        {
-            LOG_DEBUG("error: commit data %d is not an object\n", (int)(i + 1));
-            json_decref(root);
-        }
-
-        dev_id = json_object_get(data, "DEV_ID");
-        if(!json_is_string(dev_id))
-        {
-            LOG_DEBUG("error: DEV_ID %d: DEV_ID is not a string\n", (int)(i + 1));
-        }
-        dev_id_str = json_string_value(dev_id);
-        memset(decode_dev_id, 0x00, sizeof(decode_dev_id));
-        base64_decode(dev_id_str, strlen(dev_id_str) , decode_dev_id);
-
-        dev_addr = json_object_get(data, "DEV_ADDR");
-        if(!json_is_integer(dev_addr))
-        {
-            LOG_DEBUG("error: DEV_ADDR %d: DEV_ADDR is not a integer\n", (int)(i + 1));
-        }
-        dev_addr_val = json_integer_value(dev_addr);
-        
-        devices[i].dev_id[0] = decode_dev_id[0];
-        devices[i].dev_id[1] = decode_dev_id[1];
-        devices[i].dev_id[2] = decode_dev_id[2];
-        devices[i].dev_addr  = dev_addr_val;
-
-        LOG_DEBUG("devices[%d] dev_id[%02x, %02x, %02x, dev_addr: %d"
-        ,i,
-        devices[i].dev_id[0],
-        devices[i].dev_id[1],
-        devices[i].dev_id[2],
-        devices[i].dev_addr );
-    }
 }
 
 void request_uart_send() 
