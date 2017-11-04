@@ -150,6 +150,7 @@ int del_socket(int fd)
 {
     int i, flag;
     flag = 0;    /*     1:found, 0:not found    */
+    
     close(fd);
     for(i = 0; i < cnt_fd_socket; i++) {
         if(fd_masks[i] == fd) {
@@ -161,6 +162,8 @@ int del_socket(int fd)
             break;
         }
     }
+
+    LOG_DEBUG("del_socket!");
 
     if(flag == 0) {
         return -1;
@@ -825,7 +828,7 @@ int check_uart (PBYTE data_buf)
             LOG_DEBUG("======   list in devices[%d]   ======\n", device_idx);
             for(it = 0; it < device_idx; it++)
             {
-                LOG_DEBUG("device[%d] addr = %d, id = [%02x %02x %02x]\n", it, devices[it].dev_addr, devices[it].dev_id[0], devices[it].dev_id[1], devices[it].dev_id[2]);
+                LOG_DEBUG("devices[%d] addr = %d, id = [%02x %02x %02x]\n", it, devices[it].dev_addr, devices[it].dev_id[0], devices[it].dev_id[1], devices[it].dev_id[2]);
             }
 
             devices_count = device_idx; //장비 개수 
@@ -986,9 +989,7 @@ int packet_process(unsigned char * inputpacket, int addr)
 
             case PACKET_CMD_RACELINERESULT_R:
             LOG_DEBUG("cmd PACKET_CMD_RACELINERESULT_R : len %d", len);
-            
             BIO_dump_fp(stdout, valuebuf, len);
-            LOG_DEBUG("cmd PACKET_CMD_RACELINERESULT_R : len %d", len);
             SSLServerSend("/gateway/raceLineResult", valuebuf, len, addr);
             break;
 
@@ -1110,7 +1111,7 @@ int packet_process(unsigned char * inputpacket, int addr)
         }
     } else { 
         //extract packet 실패
-        //nothing to doe
+        //nothing to do
     }
     
     return 0;
@@ -1416,6 +1417,18 @@ char * getDevIDFromDevices(int dev_addr)
     return NULL;
 }
 
+int getDevicesIndexFromAddr(int dev_addr)
+{
+    for (int i= 0 ; i < MAX_DEVICES ; i++)
+    {
+        if ( dev_addr == devices[i].dev_addr ) {
+            return i;
+        }
+    }
+    LOG_DEBUG("ERROR not found getDevicesIndexFromAddr");
+    return -1;
+}
+
 int get_max_fd (int a, int b, int c) {
     int list[NUM_FD], temp, x, y;
     list[0] = a, list[1] = b, list[2] = c;
@@ -1435,13 +1448,14 @@ int get_max_fd (int a, int b, int c) {
 
 int write_packet (int fd, PBYTE pbuf, int size) {
     int wrtsize = 0;
-    int it = 0;
-    char msg[100] = {0, };
+    int w = 0;
 
     if(fd > 0) {
         do {
-            wrtsize += write(fd, pbuf+wrtsize, size-wrtsize);
-            if (wrtsize <= 0) LOG_DEBUG("write packet minus size(%d)\n", wrtsize);
+            w = write(fd, pbuf+wrtsize, size-wrtsize);
+            wrtsize += w;
+            if (w <= 0) LOG_DEBUG("write packet minus size(%d)\n", w);
+
         } while ((size - wrtsize) > 0);
 
         LOG_DEBUG("write packet fd(%d), size(%d)\n", fd, size);
@@ -1451,8 +1465,6 @@ int write_packet (int fd, PBYTE pbuf, int size) {
         return -1;
     }
 }
-
-
 
 /* AES Encrypt Process 
  https://tools.ietf.org/html/rfc3602
