@@ -1254,7 +1254,7 @@ int main(int argc, char *argv[]) {
     int server_sockfd, client_sockfd = 0; 
     int client_len;
 
-    fd_set readfds, wfds;
+    fd_set readfds;
     int max_fd, r;
     struct sockaddr_in clientaddr;
 
@@ -1273,13 +1273,14 @@ int main(int argc, char *argv[]) {
     if (server_sockfd >=0 && uart_fd >= 0 ) {
         while(1) {
             FD_ZERO(&readfds);
-            FD_ZERO(&wfds);
 
+            pthread_mutex_lock(&mutex);
             if (server_sockfd) FD_SET(server_sockfd, &readfds);
             if (uart_fd) FD_SET(uart_fd, &readfds);
 
             max_fd = uart_fd > server_sockfd ? uart_fd : server_sockfd;
             max_fd = mk_fds(&readfds, max_fd);
+            pthread_mutex_unlock(&mutex);
             
             r = select(max_fd + 1, &readfds, (fd_set *)0, NULL, NULL);
 
