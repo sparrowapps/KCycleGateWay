@@ -334,7 +334,7 @@ int packet_process(unsigned char * inputpacket, int addr);
 
 int getAddrFromDevices(char * dev_id);
 char * getDevIDFromDevices(int dev_addr);
-int getDevIDFromDevicesIndex(int dev_addr);
+int getDevicesIndexFromAddr(int dev_addr);
 void make_date_data(char * outtime_val);
 
 void putRacer(int addr);

@@ -281,7 +281,6 @@ static void handle_uart_data(int fd) {
     }
 }
 
-
 static void handle_uart_request(int fd, char *request) {
     // parse and cmd process
     
@@ -1277,13 +1276,15 @@ int main(int argc, char *argv[]) {
                 if (FD_ISSET(uart_fd, &readfds)) {
                     uart_data[uart_fd].state = UART_READING;
                     
-                    struct gateway_op *message = message_queue_message_alloc_blocking(&uart_r_queue);
-                    message->operation = OP_READ_UART;
-                    message->uartfd = uart_fd;
-                    cnt ++;
-                    message->cnt = cnt;
-                    LOG_DEBUG("UART queeue_write cnt: %d",message->cnt);
-                    message_queue_write(&uart_r_queue, message);
+                    // struct gateway_op *message = message_queue_message_alloc_blocking(&uart_r_queue);
+                    // message->operation = OP_READ_UART;
+                    // message->uartfd = uart_fd;
+                    // cnt ++;
+                    // message->cnt = cnt;
+                    // LOG_DEBUG("UART queeue_write cnt: %d",message->cnt);
+                    // message_queue_write(&uart_r_queue, message);
+
+                    handle_uart_data(uart_fd);
                 }
 
                 if (FD_ISSET(server_sockfd, &readfds)) {
