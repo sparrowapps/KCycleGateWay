@@ -42,8 +42,14 @@ config.txt
 하단에 
 ~~~
 enable_uart=1
+dtoverlay=pi3-disable-bt
 ~~~
 추가
+
+블루투스 서비스 중지
+
+$sudo systemctl disable hciuart
+
 
 ## file system 확장
 ~~~
