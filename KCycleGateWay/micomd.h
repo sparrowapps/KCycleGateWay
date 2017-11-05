@@ -321,15 +321,6 @@ void make_ac_code(char * senderid, short pn, unsigned char * out_ac);
 char * hexbuf2buf(const char * hexbuf);
 int hex2val(const char ch);
 
-int extract_packet (unsigned char * inputpacket, 
-    char * outcode, 
-    char * outsubcode, 
-    char * outsenderid, 
-    short * outpn, 
-    char * outlen, 
-    unsigned char * outvalue,
-    int addr);
-    
 int packet_process(unsigned char * inputpacket, int addr);
 
 int getAddrFromDevices(char * dev_id);
@@ -340,16 +331,20 @@ void make_date_data(char * outtime_val);
 void putRacer(int addr);
 int getRacerIndex(int addr);
 
+void init_fd_masks();       // fd_masks 초기화
+int get_cnt_fd_socket();    // cnt_fd_scoket 리턴
+void del_all_socket();
+
 //micomd extern global variable
-extern int cnt_fd_socket;
+
 extern int list_end;
 extern int cmd_state;
 extern DATA_STATUS_TYPE data_status;
-extern int fd_masks[MAX_SOCKET_FD];
+
 extern unsigned char cmd_buffer[MAX_CMD][MAX_PACKET_BUFFER];
 extern int cmd_id;
 extern int ipc_send_flag;
-extern BYTE dev_id[3];
+
 extern unsigned char Key[CRL_AES192_KEY];
 extern list devices[MAX_DEVICES]; // 페어링 정보를 여기에 넣는다.
 extern int devices_count;

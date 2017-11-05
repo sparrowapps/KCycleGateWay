@@ -31,10 +31,19 @@
 #include "base64.h"
 #include "crc.h"
 
+// function prototype
+static int extract_packet (unsigned char * inputpacket, 
+    char * outcode, 
+    char * outsubcode, 
+    short * outpn, 
+    char * outlen, 
+    unsigned char * outvalue,
+    int addr);
 // common variables for threads
-int uart_fd;
-int fd_masks[MAX_SOCKET_FD];
-int cnt_fd_socket = 0;
+
+static int fd_masks[MAX_SOCKET_FD];
+static int cnt_fd_socket = 0;
+
 int init_flag = 0;
 int ap_init_flag = 1;
 int mcu_init_flag = 0;
@@ -43,7 +52,7 @@ int ipc_send_flag = 0;
 int ipc_send_count = 0;
 int ipc_send_wait = 0;
 int ssl_send_flag = 0;
-pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 BYTE SockBuffer[MAX_PACKET_BUFFER];
 BYTE MicomBuffer[MAX_PACKET_BUFFER];
@@ -53,11 +62,11 @@ int sock1_cnt[MAX_SOCKET_FD];
 
 int cmd_id = 0; 
 int cmd_state = -1; // 이전 커맨드 id
-int list_end = 0;   // 확인 필요 
+int list_end = 0;   // AT+LST_ID? 명령에 응답에 끝 인 경우 1로 세팅
 int op_mode = 0;
 int packet_size = 0;
 
-BYTE dev_id[3] = {0, 0, 0};
+BYTE g_dev_id[3] = {0, 0, 0};
 int rf_band = -1;
 int mod_address = -1;
 int rf_channel = -1;
@@ -135,6 +144,16 @@ BYTE cmd_buffer[MAX_CMD][MAX_PACKET_BUFFER] =
     "",
 };
 
+void init_fd_masks()
+{
+    memset(fd_masks, -1, MAX_SOCKET_FD);
+}
+
+int get_cnt_fd_socket()
+{
+    return cnt_fd_socket;
+}
+
 int add_socket(int fd)
 {
     if(cnt_fd_socket < MAX_SOCKET_FD) {
@@ -166,12 +185,21 @@ int del_socket(int fd)
     LOG_DEBUG("del_socket!");
 
     if(flag == 0) {
+        LOG_DEBUG("del_socket error");
         return -1;
     }
 
     --cnt_fd_socket;
 
     return i;
+}
+
+void del_all_socket()
+{
+    for (int i=0; i < cnt_fd_socket; i++)
+    {
+        del_socket(fd_masks[i]);
+    }
 }
 
 int mk_fds(fd_set *fds, int fd_max)
@@ -510,7 +538,7 @@ int check_uart (PBYTE data_buf)
 {
     int index = 0;
 
-    if(memcmp(data_buf, HEADER, strlen(HEADER)) == 0)
+    if(memcmp(data_buf, HEADER, strlen(HEADER)) == 0) // RDY SW
     {
         char* token = NULL;
         char div[] = ",:\r\n";
@@ -585,39 +613,39 @@ int check_uart (PBYTE data_buf)
                 cmd_state = _AT_USER_CMD;
             }
         }
-    }
-    else if(memcmp(data_buf, AT_ST_HEADER, strlen(AT_ST_HEADER)) == 0)
+    } // RDY SW end
+    else if(memcmp(data_buf, AT_ST_HEADER, strlen(AT_ST_HEADER)) == 0) // AT.START
     {
         cmd_id = _AT_ACODE;
         data_status = _DATA_AT_MODE;
         ipc_send_flag = 1;
     }
-    else if(memcmp(data_buf, AT_LOCKED, strlen(AT_LOCKED)) == 0)
+    else if(memcmp(data_buf, AT_LOCKED, strlen(AT_LOCKED)) == 0) //LOCKED
     {
         cmd_id = _AT_ACODE;
         ipc_send_flag = 1;
     }
-    else if(memcmp(data_buf, AT_PAIR, strlen(AT_PAIR)) == 0)
+    else if(memcmp(data_buf, AT_PAIR, strlen(AT_PAIR)) == 0)// REG.START
     {
         cmd_id = _AT_CMD_NONE;
         cmd_state = _AT_CMD_NONE;
         ipc_send_flag = 0;
     }
-    else if(memcmp(data_buf, AT_REG_FAIL, strlen(AT_REG_FAIL)) == 0)
+    else if(memcmp(data_buf, AT_REG_FAIL, strlen(AT_REG_FAIL)) == 0) // REG.FAIL
     {
         cmd_id = _AT_CMD_NONE;
         cmd_state = _AT_CMD_NONE;
         ipc_send_flag = 0;
         pair_status = _UNPAIRED;
     }
-    else if(memcmp(data_buf, AT_REG_OK, strlen(AT_REG_OK)) == 0)
+    else if(memcmp(data_buf, AT_REG_OK, strlen(AT_REG_OK)) == 0)// REG.OK
     {
         cmd_id = _AT_CMD_NONE;
         cmd_state = _AT_CMD_NONE;
         ipc_send_flag = 0;
         pair_status = _PAIRED;
     }
-    else if(memcmp(data_buf, AT_OK, strlen(AT_OK)) == 0)
+    else if(memcmp(data_buf, AT_OK, strlen(AT_OK)) == 0) // OK
     {
         switch(cmd_state)
         {
@@ -747,15 +775,15 @@ int check_uart (PBYTE data_buf)
                 break;
         }
     }
-    else if(cmd_state == _AT_ID)
+    else if(cmd_state == _AT_ID) //게이트웨이 모뎀 디바이스 아이디
     {
         int i = 0;
         
         for(i = 0; i < 3; i++)
         {
-            hex_decode((char *)(data_buf + 3*i), 1, &dev_id[i]);
+            hex_decode((char *)(data_buf + 3*i), 1, &g_dev_id[i]);
         
-            LOG_DEBUG("device_id[%d] = %02x    \n", i, dev_id[i]);
+            LOG_DEBUG("device_id[%d] = %02x    \n", i, g_dev_id[i]);
         }
         cmd_id = _AT_GRP_ID_GET;
         ipc_send_flag = 1;
@@ -866,7 +894,7 @@ int packet_process(unsigned char * inputpacket, int addr)
 
     // 내아이디 얻기를 해야 함
     LOG_DEBUG("extract_packet\n"); 
-    if ( extract_packet(inputpacket, &code, &subcode, dev_id, &pn, &len, valuebuf, addr) == 0 ){
+    if ( extract_packet(inputpacket, &code, &subcode,  &pn, &len, valuebuf, addr) == 0 ){
         //패킷 넘버 확인
 #if 0        
         if (pn < packetnumberArray[addr]) {
@@ -1118,10 +1146,9 @@ int packet_process(unsigned char * inputpacket, int addr)
 }
 
 // 입력 받은 패킷을 분해 한다.
-int extract_packet (unsigned char * inputpacket, 
+static int extract_packet (unsigned char * inputpacket, 
                     char * outcode, 
                     char * outsubcode, 
-                    char * outsenderid, 
                     short * outpn, 
                     char * outlen, 
                     unsigned char * outvalue,
@@ -1132,9 +1159,9 @@ int extract_packet (unsigned char * inputpacket,
     outcode[0] = inputpacket[0];
     outsubcode[0] = inputpacket[1];
     
-    outsenderid[0] = inputpacket[2];
-    outsenderid[1] = inputpacket[3];
-    outsenderid[2] = inputpacket[4];
+    // outsenderid[0] = inputpacket[2];
+    // outsenderid[1] = inputpacket[3];
+    // outsenderid[2] = inputpacket[4];
 
     //pn = (short)(packetnumber[1] << 8) +  (short)(packetnumber[0]);
     *outpn = (short)inputpacket[5] + (short)(inputpacket[6] << 8);
@@ -1189,7 +1216,7 @@ void make_packet(char code,
 
     memset(enc_out, 0x00, sizeof(enc_out));
     
-    make_ac_code(dev_id, pn, ac);
+    make_ac_code(g_dev_id, pn, ac);
     memcpy(packetbuf + 2, ac, 10);
     
     int encslength = 0;
@@ -1313,20 +1340,25 @@ int parse_data (PBYTE data_buf, int *cnt)
         *cnt -= 2;
         if(list_end == 0 && cmd_state == _AT_LST_ID)
         {
+            // AT+LST_ID?의 응답에
+            // 0, 60 00 01<CR><LF>
+            // 1, 60 00 08<CR><LF>
+            //<CR><LF>  //<---이런 경우에 해당
             list_end = 1;
             return 1;
         }
     }
 
-    for(ix = 0; ix < *cnt; ix++)
+    // <CR><LF> 의 카운트 얻기
+    for(ix = 0; ix < (*cnt) -1; ix++)
     {
-        if(data_buf[ix] == 0x0A)
+        if(data_buf[ix] == 0x0D && data_buf[ix+1] == 0x0A )
             index++;
     }
 
-    if(cmd_state != -1 && cmd_state != _AT_START)
+    if(cmd_state != -1 && cmd_state != _AT_START) //초기 상태와 , ++++ 이 아닌경우
     {
-        if(cmd_state == _AT_RST)
+        if(cmd_state == _AT_RST) //AT+RST=1 응답은 4줄 이상
         {
             if(index >= 4)
             {
@@ -1337,7 +1369,7 @@ int parse_data (PBYTE data_buf, int *cnt)
         }
         else
         {
-            if(index == 1)
+            if(index == 1) //CR LF 하나
             {
                 return 1;
             }
@@ -1349,17 +1381,16 @@ int parse_data (PBYTE data_buf, int *cnt)
     {
         if(cmd_state == -1)
         {
-
-            if(index >= 4)
+            if(index >= 4) //부팅시 4줄 이상
             {
                 return 1;
             }
             else
                 return 0;
         }
-        else
+        else // ++++ 인 경우
         {
-            if(memcmp(data_buf, AT_ST_HEADER, strlen(AT_ST_HEADER)) == 0)
+            if(memcmp(data_buf, AT_ST_HEADER, strlen(AT_ST_HEADER)) == 0) //AT/START
             {
                 return 1;
             }

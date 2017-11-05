@@ -42,6 +42,10 @@ static void http_write( char *msg, int fd, int modem_addr);
 static json_t *load_json(const char *jason);
 static char * from_json(const char * json, char * key);
 static int getBase64DecodeSize(char * base64encode);
+
+
+static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
 // Message queue related code
 struct gateway_op {
     enum { OP_WRITE_UART, OP_WRITE_HTTP, OP_READ_SOCKET, OP_READ_UART, OP_EXIT } operation;
@@ -216,7 +220,9 @@ static void handle_socket_data(int fd) {
     } else {
         socket_data[fd].state = SOCKET_INACTIVE;
 
+        pthread_mutex_lock(&mutex);
         del_socket(fd);
+        pthread_mutex_unlock(&mutex);
     }
 }
 
@@ -233,13 +239,18 @@ static void handle_socket_request(int fd, char *request) {
         write(fd,"OK\r\n",4); //ok 응답
 
         //소켓 제거
+        pthread_mutex_lock(&mutex);
         del_socket(fd);
+        pthread_mutex_unlock(&mutex);
 
         sprintf(sslUrlBuf,"/gateway/whatIsMyJob?%s", code);
         LOG_DEBUG("%s\n", sslUrlBuf);
         SSLServerSend(sslUrlBuf, NULL, 0, -1);
+
     } else {
+        pthread_mutex_lock(&mutex);
         del_socket(fd);
+        pthread_mutex_unlock(&mutex);
     }
 }
 
@@ -258,6 +269,8 @@ struct uart_state uart_data[FD_SETSIZE];
 static void handle_uart_data(int fd) {
     int r;
 
+    LOG_DEBUG("handle_uart_data");
+
     if((r = read(fd, uart_data[fd].buf + uart_data[fd].pos, MAX_PACKET_BYTE)) > 0) {
         
         uart_data[fd].pos += r;
@@ -265,6 +278,7 @@ static void handle_uart_data(int fd) {
         if (uart_data[fd].pos > MAX_PACKET_BYTE) { // wrong packet 
             uart_data[fd].pos = 0;
             memset(uart_data[fd].buf, 0x00, sizeof (uart_data[fd].buf));
+            LOG_DEBUG("handle_uart_data wrong packet");
             return;
         }
 
@@ -277,7 +291,7 @@ static void handle_uart_data(int fd) {
         }
     } else {
         uart_data[fd].state = UART_INACTIVE;
-        
+        LOG_DEBUG("handle_uart_data read error %d", r);
     }
 }
 
@@ -285,6 +299,8 @@ static void handle_uart_request(int fd, char *request) {
     // parse and cmd process
     
     int uart_cnt = uart_data[fd].pos;
+
+    LOG_DEBUG("handle_uart_request ");
     
     if (parse_data(request , &uart_cnt) == 1) {
         LOG_DEBUG("PARSE OK :");printf("%s\n",request);
@@ -316,6 +332,7 @@ static void handle_uart_request(int fd, char *request) {
         uart_data[fd].pos = 0;
         memset(uart_data[fd].buf, 0x00, sizeof (uart_data[fd].buf));
     } else {
+        LOG_DEBUG("handle_uart_request parse_data : fail");
         return;
     }
 }
@@ -386,7 +403,7 @@ static void http_write( char *msg, int fd, int modem_addr) {
     int is_uart_send = 1;// 1전송, 0 미전송
 
     cmd_id = _AT_USER_CMD;
-    //ssl 응답을 처리 하는 함수 
+    //ssl 응답을 처리 하는 함수
     if (outmsg != NULL) {
 
         jason_str = strstr(outmsg, "\r\n\r\n") + 4;
@@ -812,7 +829,7 @@ static void http_write( char *msg, int fd, int modem_addr) {
 
                 char indexChar = index[0] - 0x31;    
 
-                make_packet(PACKET_CMD_LOG_REQ_S, 0x00, addr, 1, indexChar, outpacket, &outpacketlen);
+                make_packet(PACKET_CMD_LOG_REQ_S, 0x00, addr, 1, &indexChar, outpacket, &outpacketlen);
                 base64_encode(outpacket, outpacketlen , base_encode);
                 sprintf(cmd_buffer[cmd_id], "%d,%s\r\n", addr, base_encode);
                 LOG_DEBUG("cmd_buffer[cmd_id] %s\n",cmd_buffer[cmd_id]);
@@ -1100,7 +1117,7 @@ void SSLServerSend(char *url, char *value, int valuelen, int modem_addr) {
         int idx = getDevicesIndexFromAddr( modem_addr );
 
         if (devices[idx].dev_id[0] == 0 && devices[idx].dev_id[1] == 0 && devices[idx].dev_id[2] == 0 ) {
-            BIO_dump_fp(stdout, devices, sizeof(devices));
+            BIO_dump_fp(stdout, (char *)devices, sizeof(devices));
         }
 
         base64_encode(devices[idx].dev_id, 3, base_dev_id);
@@ -1241,7 +1258,7 @@ int main(int argc, char *argv[]) {
     int max_fd, r;
     struct sockaddr_in clientaddr;
 
-    memset(fd_masks, -1, MAX_SOCKET_FD);
+    init_fd_masks();
 
     uart_fd =  open_uart();
     server_sockfd = create_socket(PORT_NUM);
@@ -1293,10 +1310,15 @@ int main(int argc, char *argv[]) {
                         LOG_DEBUG("Failed to accept the connection request from App Framework!\n");
                     } else {
                         
-                        if(add_socket(client_sockfd) == -1) {
-                            LOG_DEBUG("Failed to add socket because of the number of socket(%d) !! \n", cnt_fd_socket);
+                        // add_socket() / del_socket() 내부 소켓 카운트 증감 보호
+                        pthread_mutex_lock(&mutex);
+                        int add_socket_res = add_socket(client_sockfd);
+                        pthread_mutex_unlock(&mutex);
+
+                        if(add_socket_res == -1) {
+                            LOG_DEBUG("Failed to add socket because of the number of socket(%d) !! \n", get_cnt_fd_socket());
                         } else {
-                            LOG_DEBUG("App Framework socket connected[fd = %d, cnt_fd = %d]!!!\n", client_sockfd, cnt_fd_socket);
+                            LOG_DEBUG("App Framework socket connected[fd = %d, cnt_fd = %d]!!!\n", client_sockfd, get_cnt_fd_socket());
 
                             socket_data[client_sockfd].state = SOCKET_READING;
                             socket_data[client_sockfd].pos = 0;
@@ -1311,12 +1333,9 @@ int main(int argc, char *argv[]) {
                     }
                 }
             }
-        }
+        } // while(1)
 
-        for(int i=0; i < cnt_fd_socket; i++)
-        {
-            del_socket(fd_masks[i]);
-        }
+        del_all_socket();
 
         close(server_sockfd);
         uart_close(uart_fd);
