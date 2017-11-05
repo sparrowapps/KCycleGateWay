@@ -996,6 +996,7 @@ static void http_write( char *msg, int fd, int modem_addr) {
 
         // uart 전송 요청
         if (is_uart_send == 1) {
+            cmd_state = cmd_id; //이전 전송 메세지를 할당
             if ( cmd_id == _AT_USER_CMD ) {
                 // rf 패킷 
                 struct gateway_op *message = message_queue_message_alloc_blocking(&uart_w_queue);
@@ -1014,8 +1015,6 @@ static void http_write( char *msg, int fd, int modem_addr) {
                 struct gateway_op *message = message_queue_message_alloc_blocking(&uart_w_queue);
                 LOG_DEBUG("SEDND : %s \n", (char *)cmd_buffer[cmd_id]);
                 message->operation = OP_WRITE_UART;
-
-                cmd_state = cmd_id; //이전 전송 메세지를 할당
                 
                 unsigned char * buf;
                 buf = malloc(MAX_PACKET_BUFFER);
@@ -1310,7 +1309,6 @@ int main(int argc, char *argv[]) {
                             message_queue_write(&socket_queue, message);
                         }
                     }
-
                 }
             }
         }
