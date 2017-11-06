@@ -169,10 +169,10 @@ typedef enum AT_CMD {
     _AT_CMD_NONE = 20, 
 } AT_CMD_TYPE;          
 
-typedef enum DATA_STATUS {
+typedef enum DATA_MODE {
     _DATA_RF_MODE = 0,
     _DATA_AT_MODE = 1
-} DATA_STATUS_TYPE;
+} DATA_MODE_TYPE;
 
 typedef enum PAIR_STATUS {
     _UNPAIRED = 0,
@@ -335,15 +335,15 @@ void init_fd_masks();       // fd_masks 초기화
 int get_cnt_fd_socket();    // cnt_fd_scoket 리턴
 void del_all_socket();
 
+// cmd_state 인터페이스
+int get_cmd_state();
+void set_cmd_state(int cmd);
+int get_list_end();
 //micomd extern global variable
 
-extern int list_end;
-extern int cmd_state;
-extern DATA_STATUS_TYPE data_status;
+extern DATA_MODE_TYPE data_mode;
 
 extern unsigned char cmd_buffer[MAX_CMD][MAX_PACKET_BUFFER];
-extern int cmd_id;
-extern int ipc_send_flag;
 
 extern unsigned char Key[CRL_AES192_KEY];
 extern list devices[MAX_DEVICES]; // 페어링 정보를 여기에 넣는다.

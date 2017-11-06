@@ -48,7 +48,7 @@ int init_flag = 0;
 int ap_init_flag = 1;
 int mcu_init_flag = 0;
 int ipc1_flag = 0;
-int ipc_send_flag = 0;
+
 int ipc_send_count = 0;
 int ipc_send_wait = 0;
 int ssl_send_flag = 0;
@@ -60,7 +60,7 @@ BYTE Sock1TempBuf[MAX_SOCKET_FD][MAX_PACKET_BUFFER];
 BYTE TempMsgBuf[MAX_PACKET_BUFFER];
 int sock1_cnt[MAX_SOCKET_FD];
 
-int cmd_id = 0; 
+
 int cmd_state = -1; // 이전 커맨드 id
 int list_end = 0;   // AT+LST_ID? 명령에 응답에 끝 인 경우 1로 세팅
 int op_mode = 0;
@@ -74,9 +74,8 @@ int bcst_status = 0;
 int data_rate = -1;
 int rand_channel = -1;
 PAIR_STATUS_TYPE pair_status = _UNPAIRED; // pair 유무 UNPARED 문자 확인 
-DATA_STATUS_TYPE data_status = _DATA_RF_MODE; // AT 커맨드로 데이터를 처리 할때 data_status 1
+DATA_MODE_TYPE data_mode = _DATA_RF_MODE; // AT 커맨드로 데이터를 처리 할때 data_mode 1
 RESET_STATUS_TYPE rst_status = _RESET_NONE;  // AT reset 처리 했을때 1
-
 
 int device_idx = 0; 
 
@@ -451,27 +450,25 @@ int check_rf_data(PBYTE data_buf)
 
         if(op_mode != 1 )
         {
-            cmd_id = _AT_START;
-            ipc_send_flag = 1;
-            data_status = _DATA_AT_MODE;
-            LOG_DEBUG("send_message = %s , send_flag = %d\n", cmd_buffer[_AT_START], ipc_send_flag);
+            request_uart_send(_AT_START);
+            data_mode = _DATA_AT_MODE;
+            LOG_DEBUG("send_message = %s ", cmd_buffer[_AT_START]);
         }
         else 
         {
             if(rst_status == _RESET_STATUS)
             {
-                ipc_send_flag = 0;
+                // uart 전송 없음
                 rst_status = _RESET_NONE;
-                data_status = _DATA_RF_MODE;
+                data_mode = _DATA_RF_MODE;
                 cmd_state = _AT_USER_CMD;
                 LOG_DEBUG("data receiving status................\n");
             }
             else
             {
                 // ++++ 전송
-                cmd_id = _AT_START;
-                ipc_send_flag = 1;
-                data_status = _DATA_AT_MODE;
+                request_uart_send(_AT_START);
+                data_mode = _DATA_AT_MODE;
                 LOG_DEBUG("AT command mode ....................\n");
             }
         }
@@ -499,16 +496,13 @@ int check_rf_data(PBYTE data_buf)
                 if(memcmp(token, PING_CHECK, strlen(PING_CHECK)) == 0)
                 {
                     //버퍼링 중에는 ping 체크가 busy로 날라간다.
-                    cmd_id = _AT_USER_CMD;
-
                     if (busy_flag != 0 ) {
-                        sprintf(cmd_buffer[cmd_id], "%d,busy\r\n", addr);
+                        sprintf(cmd_buffer[_AT_USER_CMD], "%d,busy\r\n", addr);
                     } else {
-                        sprintf(cmd_buffer[cmd_id], "%d,ping\r\n", addr);
+                        sprintf(cmd_buffer[_AT_USER_CMD], "%d,ping\r\n", addr);
                     }
 
-                    ipc_send_flag = 1;
-                    request_uart_send();
+                    request_uart_send(_AT_USER_CMD);
                 }
                 else
                 {
@@ -594,17 +588,17 @@ int check_uart (PBYTE data_buf)
 
         if(op_mode != 1)
         {
-            cmd_id = _AT_START;
-            ipc_send_flag = 1;
-            LOG_DEBUG("send_message = %s , send_flag = %d\n", cmd_buffer[cmd_id], ipc_send_flag);
+            // cmd_id = _AT_START;
+            // ipc_send_flag = 1;
+            request_uart_send(_AT_START);
         }
         else 
         {
             if(rst_status == _RESET_STATUS)
             {
-                ipc_send_flag = 0;
+                // ipc_send_flag = 0;
                 rst_status = _RESET_NONE;
-                data_status = _DATA_RF_MODE;
+                data_mode = _DATA_RF_MODE;
                 cmd_state = _AT_USER_CMD;
                 LOG_DEBUG("data receiving status................\n");
             }
@@ -616,33 +610,36 @@ int check_uart (PBYTE data_buf)
     } // RDY SW end
     else if(memcmp(data_buf, AT_ST_HEADER, strlen(AT_ST_HEADER)) == 0) // AT.START
     {
-        cmd_id = _AT_ACODE;
-        data_status = _DATA_AT_MODE;
-        ipc_send_flag = 1;
+        // cmd_id = _AT_ACODE;
+        // ipc_send_flag = 1;
+        request_uart_send(_AT_ACODE);
+        data_mode = _DATA_AT_MODE;
+
     }
     else if(memcmp(data_buf, AT_LOCKED, strlen(AT_LOCKED)) == 0) //LOCKED
     {
-        cmd_id = _AT_ACODE;
-        ipc_send_flag = 1;
+        // cmd_id = _AT_ACODE;
+        // ipc_send_flag = 1;
+        request_uart_send(_AT_ACODE);
     }
     else if(memcmp(data_buf, AT_PAIR, strlen(AT_PAIR)) == 0)// REG.START
     {
-        cmd_id = _AT_CMD_NONE;
+        // cmd_id = _AT_CMD_NONE;
         cmd_state = _AT_CMD_NONE;
-        ipc_send_flag = 0;
+        // ipc_send_flag = 0;
     }
     else if(memcmp(data_buf, AT_REG_FAIL, strlen(AT_REG_FAIL)) == 0) // REG.FAIL
     {
-        cmd_id = _AT_CMD_NONE;
+        // cmd_id = _AT_CMD_NONE;
         cmd_state = _AT_CMD_NONE;
-        ipc_send_flag = 0;
+        // ipc_send_flag = 0;
         pair_status = _UNPAIRED;
     }
     else if(memcmp(data_buf, AT_REG_OK, strlen(AT_REG_OK)) == 0)// REG.OK
     {
-        cmd_id = _AT_CMD_NONE;
+        // cmd_id = _AT_CMD_NONE;
         cmd_state = _AT_CMD_NONE;
-        ipc_send_flag = 0;
+        // ipc_send_flag = 0;
         pair_status = _PAIRED;
     }
     else if(memcmp(data_buf, AT_OK, strlen(AT_OK)) == 0) // OK
@@ -650,128 +647,154 @@ int check_uart (PBYTE data_buf)
         switch(cmd_state)
         {
             case _AT_ACK_EN:
-                cmd_id = _AT_MADD_GET;
-                ipc_send_flag = 1;
+                //cmd_id = _AT_MADD_GET;
+                //ipc_send_flag = 1;
+                request_uart_send(_AT_ACODE);
             break;
 
             case _AT_ACODE:
 
                 if (manaual_pairinig_status == _MANUAL_PAIRING_DELETE)
                 {
-                    cmd_id = _AT_DEL_ALL_ID;
-                    ipc_send_flag = 1;
+                    //cmd_id = _AT_DEL_ALL_ID;
+                    //ipc_send_flag = 1;
+                    request_uart_send(_AT_DEL_ALL_ID);
                     break;
                 }
 
                 if (manaual_pairinig_status == _MANUAL_PAIRING_STATUS || manaual_pairinig_status == _MANUAL_PAIRING_HOST )
                 {
-                    cmd_id = _AT_GRP_ID;
-                    ipc_send_flag = 1;
+                    // cmd_id = _AT_GRP_ID;
+                    // ipc_send_flag = 1;
+                    request_uart_send(_AT_GRP_ID);
                     break;
                 }
 
                 if(pair_status == _PAIRED)
                 {
-                    cmd_id = _AT_ID;
-                    ipc_send_flag = 1;
+                    // cmd_id = _AT_ID;
+                    // ipc_send_flag = 1;
+                    request_uart_send(_AT_ID);
                     device_idx = 0;
                 }
                 else
                 {
-                    cmd_id = _AT_MODE;
-                    ipc_send_flag = 1;
+                    // cmd_id = _AT_MODE;
+                    // ipc_send_flag = 1;
+                    request_uart_send(_AT_MODE);
                 }
                 break;
 
             case _AT_MODE:
                 op_mode = 1;
                 {
-                    cmd_id = _AT_FBND;
-                    ipc_send_flag = 1;
+                    // cmd_id = _AT_FBND;
+                    // ipc_send_flag = 1;
+                    request_uart_send(_AT_FBND);
                 }
                 break;
 
             case _AT_GRP_ID:
-                cmd_id = _AT_FBND;
-                ipc_send_flag = 1;
+                // cmd_id = _AT_FBND;
+                // ipc_send_flag = 1;
+                request_uart_send(_AT_FBND);
                 break;
 
             case _AT_FBND:
                  if (manaual_pairinig_status == _MANUAL_PAIRING_STATUS) {
-                     cmd_id = _AT_CHN;
+                    //  cmd_id = _AT_CHN;
+                    request_uart_send(_AT_CHN);
                  } else if (manaual_pairinig_status == _MANUAL_PAIRING_HOST) {               
-                    cmd_id = _AT_MADD;
+                    // cmd_id = _AT_MADD;
+                    request_uart_send(_AT_MADD);
                  } else {
-                    cmd_id = _AT_CHN;
+                    // cmd_id = _AT_CHN;
+                    request_uart_send(_AT_CHN);
                  }
-                ipc_send_flag = 1;
+                // ipc_send_flag = 1;
                 break;
 
             case _AT_MADD:
-                cmd_id = _AT_CHN;
-                ipc_send_flag = 1;
+                // cmd_id = _AT_CHN;
+                // ipc_send_flag = 1;
+                request_uart_send(_AT_CHN);
                 break;
 
             case _AT_CHN:
                 if (manaual_pairinig_status != _MANUAL_PAIRING_NONE ) {
-                    cmd_id = _AT_DRATE;
+                    // cmd_id = _AT_DRATE;
                     device_idx = 0;
+                    request_uart_send(_AT_DRATE);
                 } else {
-                    cmd_id = _AT_BCST;
+                    // cmd_id = _AT_BCST;
+                    request_uart_send(_AT_BCST);
                 }
-                ipc_send_flag = 1;
+                // ipc_send_flag = 1;
                 break;
 
             case _AT_BCST:
                 bcst_status = 1;
-                cmd_id = _AT_DRATE;
-                ipc_send_flag = 1;
+                // cmd_id = _AT_DRATE;
+                // ipc_send_flag = 1;
+                request_uart_send(_AT_DRATE);
                 break;
 
             case _AT_DRATE:
             case _AT_REG_ID:
                 if (manaual_pairinig_status != _MANUAL_PAIRING_NONE ) {
                     LOG_DEBUG("device_idx : %d, %d", device_idx,devices_count);
-                    cmd_id = _AT_REG_ID;
+
                     // 디바이스 리스트 를 엎어야 한다.
                     sprintf(cmd_buffer[_AT_REG_ID], AT_REG_ID_FMT, devices[device_idx].dev_addr, 
                         devices[device_idx].dev_id[0], 
                         devices[device_idx].dev_id[1], 
                         devices[device_idx].dev_id[2]);
                         device_idx ++;
+
                         if (device_idx > devices_count) {
                             LOG_DEBUG("device_idx : %d, %d", device_idx,devices_count);
-                            cmd_id = _AT_RST;
+                            // cmd_id = _AT_RST;
                             rst_status = _RESET_STATUS;
-                            data_status = _DATA_RF_MODE;
+                            data_mode = _DATA_RF_MODE;
+                            request_uart_send(_AT_RST);
                         }
+                        else {
+                            // cmd_id = _AT_REG_ID;
+                            request_uart_send(_AT_REG_ID);
+                        }
+                        
                 } else {
-                    cmd_id = _AT_RNDCH;
+                    // cmd_id = _AT_RNDCH;
+                    request_uart_send(_AT_RNDCH);
                 }
-                ipc_send_flag = 1;
+                // ipc_send_flag = 1;
                 break;
 
             case _AT_RNDCH:
                 rand_channel = 0;
-                cmd_id = _AT_ID;
-                ipc_send_flag = 1;
+                // cmd_id = _AT_ID;
+                // ipc_send_flag = 1;
+                request_uart_send(_AT_ID);
                 break;
 
             case _AT_PAIR:
-                cmd_id = _AT_CMD_NONE;
+                // cmd_id = _AT_CMD_NONE;
                 cmd_state = _AT_CMD_NONE;
-                ipc_send_flag = 0;
+                // ipc_send_flag = 0;
                 pair_status = _PAIRED;
                 break;
             
             case _AT_DEL_ALL_ID:
-                cmd_id = _AT_RST;
+                // cmd_id = _AT_RST;
                 rst_status = _RESET_STATUS;
-                data_status = _DATA_RF_MODE;
+                list_end = 0;
+                data_mode = _DATA_RF_MODE;
+                // ipc_send_flag = 1;
+                request_uart_send(_AT_RST);
                 break;
 
             default:
-                ipc_send_flag = 0;
+                // ipc_send_flag = 0;
                 break;
         }
     }
@@ -785,8 +808,9 @@ int check_uart (PBYTE data_buf)
         
             LOG_DEBUG("device_id[%d] = %02x    \n", i, g_dev_id[i]);
         }
-        cmd_id = _AT_GRP_ID_GET;
-        ipc_send_flag = 1;
+        // cmd_id = _AT_GRP_ID_GET;
+        // ipc_send_flag = 1;
+        request_uart_send(_AT_GRP_ID_GET);
     }
     else if (cmd_state == _AT_GRP_ID_GET) //GRP_ID  얻기
     {
@@ -799,23 +823,28 @@ int check_uart (PBYTE data_buf)
         
             LOG_DEBUG("group id[%d] = %02x    \n", i, grp_id[i]);
         }
-        cmd_id = _AT_ACK_EN;
-        ipc_send_flag = 1;
+        // cmd_id = _AT_ACK_EN;
+        // ipc_send_flag = 1;
+        request_uart_send(_AT_ACK_EN);
     } 
     else if (cmd_state == _AT_MADD_GET) // MADD 얻기
     {
         LOG_DEBUG("MADD : %s", data_buf);
 
     #if 1
-        cmd_id = _AT_LST_ID; // 리스트 얻기 제거됨
+        // cmd_id = _AT_LST_ID; // 리스트 얻기 제거됨
+        // ipc_send_flag = 1;
+        request_uart_send(_AT_LST_ID);
     #else 
         // 리셋
-        cmd_id = _AT_RST;
+        // cmd_id = _AT_RST;
         rst_status = _RESET_STATUS;
         list_end = 0;
-        data_status = _DATA_RF_MODE;
+        data_mode = _DATA_RF_MODE;
+        // ipc_send_flag = 1;
+        request_uart_send(_AT_RST);
     #endif
-        ipc_send_flag = 1;
+        
     }
     else if(cmd_state == _AT_LST_ID)
     {
@@ -861,11 +890,12 @@ int check_uart (PBYTE data_buf)
 
             devices_count = device_idx; //장비 개수 
 
-            cmd_id = _AT_RST;
+            // cmd_id = _AT_RST;
             rst_status = _RESET_STATUS;
             list_end = 0;
-            data_status = _DATA_RF_MODE;
-            ipc_send_flag = 1;
+            data_mode = _DATA_RF_MODE;
+            // ipc_send_flag = 1;
+            request_uart_send(_AT_RST);
         }
     }
 
@@ -906,78 +936,78 @@ int packet_process(unsigned char * inputpacket, int addr)
         switch (code)
         {
             case PACKET_CMD_PING_R:
-            //todo 내 senderid 를 만들어야 한다.
-            LOG_DEBUG("cmd PACKET_CMD_PING_R");
+                //todo 내 senderid 를 만들어야 한다.
+                LOG_DEBUG("cmd PACKET_CMD_PING_R");
 
-            //서버 전송 리퀘스트
-            SSLServerSend("/gateway/ping", valuebuf, len, addr);
-            break;
+                //서버 전송 리퀘스트
+                SSLServerSend("/gateway/ping", valuebuf, len, addr);
+                break;
 
             case PACKET_CMD_INSPECTION_REQ_R: // 패턴2
-            LOG_DEBUG("PACKET_CMD_INSPECTION_REQ_R");
-            LOG_DEBUG("PACKET_CMD_INSPECTION_REQ_R valuebuf: %x len :%d", *valuebuf, len );
-            SSLServerSend("/gateway/inspectionRequest", valuebuf, len, addr);
-            break;
+                LOG_DEBUG("PACKET_CMD_INSPECTION_REQ_R");
+                LOG_DEBUG("PACKET_CMD_INSPECTION_REQ_R valuebuf: %x len :%d", *valuebuf, len );
+                SSLServerSend("/gateway/inspectionRequest", valuebuf, len, addr);
+                break;
 
             case PACKET_CMD_INSPECTION_RES_R:
-            LOG_DEBUG("cmd PACKET_CMD_INSPECTION_RES_R : %x", valuebuf[0]);
-        
-            SSLServerSend("/gateway/inspectionResult", valuebuf, len, addr);
-            break;
+                LOG_DEBUG("cmd PACKET_CMD_INSPECTION_RES_R : %x", valuebuf[0]);
+            
+                SSLServerSend("/gateway/inspectionResult", valuebuf, len, addr);
+                break;
 
             case PACKET_CMD_ENCKEY_REQ_R:
-            LOG_DEBUG("cmd PACKET_CMD_ENCKEY_REQ_R");
-        
-            SSLServerSend("/gateway/encryptionKeyRequest", valuebuf, len, addr);
-            break;
+                LOG_DEBUG("cmd PACKET_CMD_ENCKEY_REQ_R");
+            
+                SSLServerSend("/gateway/encryptionKeyRequest", valuebuf, len, addr);
+                break;
 
             case PACKET_CMD_LOGCHK_R:
-            LOG_DEBUG("cmd PACKET_CMD_LOGCHK_R");
-        
-            SSLServerSend("/gateway/logCheckMessage", valuebuf, len, addr);
-            break;
+                LOG_DEBUG("cmd PACKET_CMD_LOGCHK_R");
+            
+                SSLServerSend("/gateway/logCheckMessage", valuebuf, len, addr);
+                break;
 
             case PACKET_CMD_ERRORCHK_R:
-            LOG_DEBUG("cmd PACKET_CMD_ERRORCHK_R");
-        
-            SSLServerSend("/gateway/errorCheck", valuebuf, len, addr);
-            break;
+                LOG_DEBUG("cmd PACKET_CMD_ERRORCHK_R");
+            
+                SSLServerSend("/gateway/errorCheck", valuebuf, len, addr);
+                break;
 
             case PACKET_CMD_TRAININGSTART_R: //패턴2
-            LOG_DEBUG("cmd PACKET_CMD_TRAININGSTART_R");
-        
-            SSLServerSend("/gateway/tranningStart", valuebuf, len, addr);
-            break;
+                LOG_DEBUG("cmd PACKET_CMD_TRAININGSTART_R");
+            
+                SSLServerSend("/gateway/tranningStart", valuebuf, len, addr);
+                break;
 
             case PACKET_CMD_TRAININGSTOP_R: //패턴2
-            LOG_DEBUG("cmd PACKET_CMD_TRAININGSTOP_R");
-        
-            SSLServerSend("/gateway/tranningStop", valuebuf, len, addr);
-            break;
+                LOG_DEBUG("cmd PACKET_CMD_TRAININGSTOP_R");
+            
+                SSLServerSend("/gateway/tranningStop", valuebuf, len, addr);
+                break;
 
             case PACKET_CMD_DASHSTART_R: //패턴2
-            LOG_DEBUG("cmd PACKET_CMD_DASHSTART_R");
-        
-            SSLServerSend("/gateway/dashStart", valuebuf, len, addr);
-            break;
+                LOG_DEBUG("cmd PACKET_CMD_DASHSTART_R");
+            
+                SSLServerSend("/gateway/dashStart", valuebuf, len, addr);
+                break;
 
             case PACKET_CMD_DASHSTOP_R: //패턴2
-            LOG_DEBUG("cmd PACKET_CMD_DASHSTOP_R");
-        
-            SSLServerSend("/gateway/dashStop", valuebuf, len, addr);
-            break;
+                LOG_DEBUG("cmd PACKET_CMD_DASHSTOP_R");
+            
+                SSLServerSend("/gateway/dashStop", valuebuf, len, addr);
+                break;
 
             case PACKET_CMD_DASHRESULT_R:
-            LOG_DEBUG("cmd PACKET_CMD_DASHRESULT_R");
-        
-            SSLServerSend("/gateway/dashResult", valuebuf, len, addr);
-            break;
+                LOG_DEBUG("cmd PACKET_CMD_DASHRESULT_R");
+            
+                SSLServerSend("/gateway/dashResult", valuebuf, len, addr);
+                break;
 
             case PACKET_CMD_RACESTATECHK_R:
-            LOG_DEBUG("cmd PACKET_CMD_RACESTATECHK_R");
-        
-            SSLServerSend("/gateway/raceStateCheck", valuebuf, len, addr);
-            break;
+                LOG_DEBUG("cmd PACKET_CMD_RACESTATECHK_R");
+            
+                SSLServerSend("/gateway/raceStateCheck", valuebuf, len, addr);
+                break;
 
             //case PACKET_CMD_RACESTART_R: //패턴2
             // LOG_DEBUG("cmd PACKET_CMD_RACESTART_R");
@@ -986,159 +1016,154 @@ int packet_process(unsigned char * inputpacket, int addr)
             //break;
 
             case PACKET_CMD_RACESTOP_R: //패턴2
-            LOG_DEBUG("cmd PACKET_CMD_RACESTOP_R");
-        
-            SSLServerSend("/gateway/raceStop", valuebuf, len, addr);
-            break;
+                LOG_DEBUG("cmd PACKET_CMD_RACESTOP_R");
+            
+                SSLServerSend("/gateway/raceStop", valuebuf, len, addr);
+                break;
 
             case PACKET_CMD_RACE_END_R:
-            LOG_DEBUG("cmd PACKET_CMD_RACE_END_R");
-        
-            SSLServerSend("/gateway/raceEnd", valuebuf, len, addr);
-            break;
+                LOG_DEBUG("cmd PACKET_CMD_RACE_END_R");
+            
+                SSLServerSend("/gateway/raceEnd", valuebuf, len, addr);
+                break;
 
             case PACKET_CMD_RACERESULT_READY_R: //패턴2
-            LOG_DEBUG("cmd PACKET_CMD_RACERESULT_READY_R");
-        
-            SSLServerSend("/gateway/raceResultReady", valuebuf, len, addr);
-            break;
+                LOG_DEBUG("cmd PACKET_CMD_RACERESULT_READY_R");
+            
+                SSLServerSend("/gateway/raceResultReady", valuebuf, len, addr);
+                break;
 
             case PACKET_CMD_RACELINERESULT_EXTRA_R: //패턴2
-            LOG_DEBUG("cmd PACKET_CMD_RACELINERESULT_EXTRA_R");
-            
-            SSLServerSend("/gateway/raceLineResultExtra", valuebuf, len, addr);
-            break;
+                LOG_DEBUG("cmd PACKET_CMD_RACELINERESULT_EXTRA_R");
+                
+                SSLServerSend("/gateway/raceLineResultExtra", valuebuf, len, addr);
+                break;
 
             case PACKET_CMD_LOG_REQ_R: //패턴2
-            LOG_DEBUG("cmd PACKET_CMD_LOG_REQ_R");
-            
-            SSLServerSend("/gateway/logRequest", valuebuf, len, addr);
-            break;
+                LOG_DEBUG("cmd PACKET_CMD_LOG_REQ_R");
+                
+                SSLServerSend("/gateway/logRequest", valuebuf, len, addr);
+                break;
 
             case PACKET_CMD_RACELINERESULT_R:
-            LOG_DEBUG("cmd PACKET_CMD_RACELINERESULT_R : len %d", len);
-            BIO_dump_fp(stdout, valuebuf, len);
-            SSLServerSend("/gateway/raceLineResult", valuebuf, len, addr);
-            break;
+                LOG_DEBUG("cmd PACKET_CMD_RACELINERESULT_R : len %d", len);
+                BIO_dump_fp(stdout, valuebuf, len);
+                SSLServerSend("/gateway/raceLineResult", valuebuf, len, addr);
+                break;
 
             case PACKET_CMD_RACERESULT_REQ_R:
-            LOG_DEBUG("cmd PACKET_CMD_RACERESULT_REQ_R");
-        
-            SSLServerSend("/gateway/raceCycleResultRequest", valuebuf, len, addr);
-            break;
+                LOG_DEBUG("cmd PACKET_CMD_RACERESULT_REQ_R");
+            
+                SSLServerSend("/gateway/raceCycleResultRequest", valuebuf, len, addr);
+                break;
 
             case PACKET_CMD_RACERESULT_END_R:
-            LOG_DEBUG("cmd PACKET_CMD_RACERESULT_END_R");
-            SSLServerSend("/gateway/raceResultEnd", valuebuf, len, addr);
-            break;
+                LOG_DEBUG("cmd PACKET_CMD_RACERESULT_END_R");
+                SSLServerSend("/gateway/raceResultEnd", valuebuf, len, addr);
+                break;
 
             case PACKET_CMD_IR_REF_SET_R:
-            LOG_DEBUG("cmd PACKET_CMD_IR_REF_SET_R");
-            SSLServerSend("/gateway/irReferenceSet", valuebuf, len, addr);
-            break;
+                LOG_DEBUG("cmd PACKET_CMD_IR_REF_SET_R");
+                SSLServerSend("/gateway/irReferenceSet", valuebuf, len, addr);
+                break;
 
             //건으로 부터 출발 신호를 받았다.
             case PACKET_CMD_RACESTART_GUN_R: 
             case PACKET_CMD_RACESTART_GUN2_R:
-            LOG_DEBUG("cmd PACKET_CMD_RACESTART_GUN_R : racer count %d", racer_count);
-            for (int i = 0; i < racer_count; i ++ ){
-                racer_idx[i] = -1;
-                race_res_offset[i] = -1;
-                memset(race_res_buf[i], 0x00, MAX_HTTPS_PACKET_BUFFER);
-            }
+                LOG_DEBUG("cmd PACKET_CMD_RACESTART_GUN_R : racer count %d", racer_count);
+                for (int i = 0; i < racer_count; i ++ ){
+                    racer_idx[i] = -1;
+                    race_res_offset[i] = -1;
+                    memset(race_res_buf[i], 0x00, MAX_HTTPS_PACKET_BUFFER);
+                }
 
-            for (int i = 0; i< racer_count; i++ ) { // 경기 참여 디바이스에 RACE sTART 전송
+                for (int i = 0; i< racer_count; i++ ) { // 경기 참여 디바이스에 RACE sTART 전송
+                    memset(outpacket, 0x00, sizeof(outpacket));
+                    memset(base_encode, 0x00, sizeof(base_encode));
+                    outpacketlen = 0;
+
+                    make_packet(PACKET_CMD_RACESTART_S, 0x00, racer_addr[i], 0, NULL, outpacket, &outpacketlen);
+                    base64_encode(outpacket, outpacketlen , base_encode);
+                    sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", racer_addr[i], base_encode);
+                    LOG_DEBUG("cmd PACKET_CMD_RACESTART_GUN_R : cmdbuffer : %s", cmd_buffer[_AT_USER_CMD]);
+                    request_uart_send(_AT_USER_CMD);
+                }
+                //건에게 응답
                 memset(outpacket, 0x00, sizeof(outpacket));
                 memset(base_encode, 0x00, sizeof(base_encode));
                 outpacketlen = 0;
 
-                make_packet(PACKET_CMD_RACESTART_S, 0x00, racer_addr[i], 0, NULL, outpacket, &outpacketlen);
+                //건이 2가지 커맨드라서 code + 1로 응답 한다.
+                if (code == PACKET_CMD_RACESTART_GUN_R) {
+                    make_packet(PACKET_CMD_RACESTART_GUN_S, 0x00, addr, 0, NULL, outpacket, &outpacketlen);
+                } else {
+                    make_packet(PACKET_CMD_RACESTART_GUN2_S, 0x00, addr, 0, NULL, outpacket, &outpacketlen);
+                }
                 base64_encode(outpacket, outpacketlen , base_encode);
-                sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", racer_addr[i], base_encode);
+                sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", addr, base_encode);
                 LOG_DEBUG("cmd PACKET_CMD_RACESTART_GUN_R : cmdbuffer : %s", cmd_buffer[_AT_USER_CMD]);
-                ipc_send_flag = 1;
-                request_uart_send();
-            }
-            //건에게 응답
-            memset(outpacket, 0x00, sizeof(outpacket));
-            memset(base_encode, 0x00, sizeof(base_encode));
-            outpacketlen = 0;
+                request_uart_send(_AT_USER_CMD);
 
-             //건이 2가지 커맨드라서 code + 1로 응답 한다.
-            if (code == PACKET_CMD_RACESTART_GUN_R) {
-                make_packet(PACKET_CMD_RACESTART_GUN_S, 0x00, addr, 0, NULL, outpacket, &outpacketlen);
-            } else {
-                make_packet(PACKET_CMD_RACESTART_GUN2_S, 0x00, addr, 0, NULL, outpacket, &outpacketlen);
-            }
-            base64_encode(outpacket, outpacketlen , base_encode);
-            sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", addr, base_encode);
-            LOG_DEBUG("cmd PACKET_CMD_RACESTART_GUN_R : cmdbuffer : %s", cmd_buffer[_AT_USER_CMD]);
-            ipc_send_flag = 1;
-            request_uart_send();
-
-            // 서버에게 raceStart 전송
-            SSLServerSend("/gateway/raceStart", valuebuf, len, -1);
-            break;
+                // 서버에게 raceStart 전송
+                SSLServerSend("/gateway/raceStart", valuebuf, len, -1);
+                break;
 
             case PACKET_CMD_RACECYCLESULT_R:
-            //todo buffering 로직 필요
-            LOG_DEBUG("cmd PACKET_CMD_RACECYCLESULT_R");
+                //todo buffering 로직 필요
+                LOG_DEBUG("cmd PACKET_CMD_RACECYCLESULT_R");
 
-            // 여기서 버퍼링을 하고 디바이스로 바로 응답을 보낸다.
-            
-            memset(outpacket, 0x00, sizeof(outpacket));
-            memset(base_encode, 0x00, sizeof(base_encode));
-            outpacketlen = 0;
-
-            // 받은 subcode를 싫어서 uart 응답 전송
-            cmd_id = _AT_USER_CMD;
-            make_packet(PACKET_CMD_RACECYCLESULT_S, subcode, addr, 0, NULL, outpacket, &outpacketlen);
-            base64_encode(outpacket, outpacketlen , base_encode);
-            sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", addr, base_encode);    
-            ipc_send_flag = 1;
-            
-
-            // 버퍼링이 끝나면 서버로 전송을 하고 끝
-            // 디바이스 별로 버퍼링 해야 함
-            if (subcode == 0x00) {
-                putRacer(addr);
-                int idx = getRacerIndex(addr);
-
-                LOG_DEBUG("START buffering ADDR %d\n",addr);
-                memcpy (race_res_buf[idx], valuebuf, RACE_RESULT_PACKET_SIZE);
-                busy_flag = 1;
-            } else if (subcode >= 0x80) {
-                //last packet
-                int idx = getRacerIndex(addr);
-                if (race_res_offset[idx] != -1 ) {
-                    race_res_offset[idx] = (subcode - 0x80) * RACE_RESULT_PACKET_SIZE;
-                    memcpy(race_res_buf[idx] + race_res_offset[idx], valuebuf, len);
-                    race_res_offset[idx] = race_res_offset[idx] + len; 
-                    LOG_DEBUG("END buffering %02x total size : %d\n" , subcode, race_res_offset[idx] );
-                    LOG_DEBUG("SSLServer /gateway/raceCycleResult\n");
-                    SSLServerSend("/gateway/raceCycleResult", race_res_buf[idx], race_res_offset[idx], addr);
-                    race_res_offset[idx] = -1; //전송 했음
-                    busy_flag = 0;
-                }
-            } else {
-                //버퍼링
-                int idx = getRacerIndex(addr);
-                race_res_offset[idx] = (subcode) * RACE_RESULT_PACKET_SIZE;
-
-                LOG_DEBUG("Buffering subcode:%02x offset : %d\n" , subcode, race_res_offset[idx]);
-                memcpy(race_res_buf[idx] + race_res_offset[idx], valuebuf, RACE_RESULT_PACKET_SIZE);
+                // 여기서 버퍼링을 하고 디바이스로 바로 응답을 보낸다.
                 
-            }
-            usleep(1000 * 50);
-            request_uart_send();
-            break;
+                memset(outpacket, 0x00, sizeof(outpacket));
+                memset(base_encode, 0x00, sizeof(base_encode));
+                outpacketlen = 0;
+
+                // 받은 subcode를 싫어서 uart 응답 전송
+                make_packet(PACKET_CMD_RACECYCLESULT_S, subcode, addr, 0, NULL, outpacket, &outpacketlen);
+                base64_encode(outpacket, outpacketlen , base_encode);
+                sprintf(cmd_buffer[_AT_USER_CMD], "%d,%s\r\n", addr, base_encode);    
+
+                // 버퍼링이 끝나면 서버로 전송을 하고 끝
+                // 디바이스 별로 버퍼링 해야 함
+                if (subcode == 0x00) {
+                    putRacer(addr);
+                    int idx = getRacerIndex(addr);
+
+                    LOG_DEBUG("START buffering ADDR %d\n",addr);
+                    memcpy (race_res_buf[idx], valuebuf, RACE_RESULT_PACKET_SIZE);
+                    busy_flag = 1;
+                } else if (subcode >= 0x80) {
+                    //last packet
+                    int idx = getRacerIndex(addr);
+                    if (race_res_offset[idx] != -1 ) {
+                        race_res_offset[idx] = (subcode - 0x80) * RACE_RESULT_PACKET_SIZE;
+                        memcpy(race_res_buf[idx] + race_res_offset[idx], valuebuf, len);
+                        race_res_offset[idx] = race_res_offset[idx] + len; 
+                        LOG_DEBUG("END buffering %02x total size : %d\n" , subcode, race_res_offset[idx] );
+                        LOG_DEBUG("SSLServer /gateway/raceCycleResult\n");
+                        SSLServerSend("/gateway/raceCycleResult", race_res_buf[idx], race_res_offset[idx], addr);
+                        race_res_offset[idx] = -1; //전송 했음
+                        busy_flag = 0;
+                    }
+                } else {
+                    //버퍼링
+                    int idx = getRacerIndex(addr);
+                    race_res_offset[idx] = (subcode) * RACE_RESULT_PACKET_SIZE;
+
+                    LOG_DEBUG("Buffering subcode:%02x offset : %d\n" , subcode, race_res_offset[idx]);
+                    memcpy(race_res_buf[idx] + race_res_offset[idx], valuebuf, RACE_RESULT_PACKET_SIZE);
+                    
+                }
+                usleep(1000 * 50);
+                request_uart_send(_AT_USER_CMD);
+                break;
                 
             default:
             //nothing todo
-            break;
+                break;
         }
     } else { 
-        //extract packet 실패
+        LOG_DEBUG("extract packet 실패");
         //nothing to do
     }
     
@@ -1399,6 +1424,23 @@ int parse_data (PBYTE data_buf, int *cnt)
         }
     }
 }
+
+// 마지막 명령 확인
+int get_cmd_state()
+{
+    return cmd_state;
+}
+
+void set_cmd_state(int cmd)
+{
+    cmd_state = cmd;
+}
+
+int get_list_end()
+{
+    return list_end;
+}
+
 
 //출전 경기 선수 addr 등록 중복되지 않는다면 racer_count 증가
 void putRacer(int addr)
