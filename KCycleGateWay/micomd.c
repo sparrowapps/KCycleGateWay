@@ -612,9 +612,8 @@ int check_uart (PBYTE data_buf)
     {
         // cmd_id = _AT_ACODE;
         // ipc_send_flag = 1;
-        request_uart_send(_AT_ACODE);
         data_mode = _DATA_AT_MODE;
-
+        request_uart_send(_AT_ACODE);
     }
     else if(memcmp(data_buf, AT_LOCKED, strlen(AT_LOCKED)) == 0) //LOCKED
     {
@@ -649,7 +648,7 @@ int check_uart (PBYTE data_buf)
             case _AT_ACK_EN:
                 //cmd_id = _AT_MADD_GET;
                 //ipc_send_flag = 1;
-                request_uart_send(_AT_ACODE);
+                request_uart_send(_AT_MADD_GET);
             break;
 
             case _AT_ACODE:
@@ -674,8 +673,9 @@ int check_uart (PBYTE data_buf)
                 {
                     // cmd_id = _AT_ID;
                     // ipc_send_flag = 1;
-                    request_uart_send(_AT_ID);
+                    
                     device_idx = 0;
+                    request_uart_send(_AT_ID);
                 }
                 else
                 {

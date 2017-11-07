@@ -316,7 +316,6 @@ static void handle_uart_request(int fd, char *request) {
         uart_data[fd].pos = 0;
         memset(uart_data[fd].buf, 0x00, sizeof (uart_data[fd].buf));
     } else {
-        LOG_DEBUG("handle_uart_request parse_data : fail");
         return;
     }
 }
