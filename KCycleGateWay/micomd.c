@@ -81,6 +81,8 @@ int device_idx = 0;
 
 MANUAL_PAIRING_STATUS_TYPE manaual_pairinig_status = _MANUAL_PAIRING_NONE;
 
+int _rf_reset = 0; //1 설정 ++++ 전송 하면 AT+RST=1을 수행 한다.
+
 list devices[MAX_DEVICES];
 int devices_count = 0; //디바이스 수
 
@@ -97,12 +99,11 @@ int last_packet_len[MAX_DEVICES] = {0,};
 char race_res_buf[MAX_RACERS][MAX_HTTPS_PACKET_BUFFER];
 int busy_flag = 0;
 int race_res_offset[MAX_RACERS] = {0, }; //버퍼링 오프셋
-int racer_idx[MAX_RACERS]; //addr로 레이서 index를 기롥
+int racer_idx[MAX_RACERS] = {-1,}; //addr로 레이서 index를 기롥
 
 int racer_addr[MAX_RACERS]; //레이스 시작 스탑 등에 디바이스 addr보관
 
-int racer_count; //race 결과 subcode = 0x00 일때 addr이 들어오는 수만큼 추가
-
+int racer_count; //Start / Stop / Dash Start Stop 레이서 카운트
 
 /* Key to be used for AES encryption/decryption */
 unsigned char Key[CRL_AES192_KEY] =
@@ -653,6 +654,17 @@ int check_uart (PBYTE data_buf)
 
             case _AT_ACODE:
 
+                //RF reset
+                if (_rf_reset == 1)
+                {
+                    rst_status = _RESET_STATUS;
+                    data_mode = _DATA_RF_MODE;
+                    _rf_reset = 0;
+                    LOG_DEBUG("AT+RST=1 send..");
+                    request_uart_send(_AT_RST);
+                    break;
+                }
+
                 if (manaual_pairinig_status == _MANUAL_PAIRING_DELETE)
                 {
                     //cmd_id = _AT_DEL_ALL_ID;
@@ -1126,7 +1138,7 @@ int packet_process(unsigned char * inputpacket, int addr)
                 // 버퍼링이 끝나면 서버로 전송을 하고 끝
                 // 디바이스 별로 버퍼링 해야 함
                 if (subcode == 0x00) {
-                    putRacer(addr);
+                    addRacer(addr);
                     int idx = getRacerIndex(addr);
 
                     LOG_DEBUG("START buffering ADDR %d\n",addr);
@@ -1143,6 +1155,7 @@ int packet_process(unsigned char * inputpacket, int addr)
                         LOG_DEBUG("SSLServer /gateway/raceCycleResult\n");
                         SSLServerSend("/gateway/raceCycleResult", race_res_buf[idx], race_res_offset[idx], addr);
                         race_res_offset[idx] = -1; //전송 했음
+                        removeRacer(addr);
                         busy_flag = 0;
                     }
                 } else {
@@ -1443,15 +1456,28 @@ int get_list_end()
 
 
 //출전 경기 선수 addr 등록 중복되지 않는다면 racer_count 증가
-void putRacer(int addr)
+void addRacer(int addr)
 {
     for (int i=0; i<MAX_RACERS; i++) {
         if (racer_idx[i] == addr )
             return;
     }
-    racer_idx[racer_count] = addr;
-    racer_count ++;
+    for (int i = 0; i < MAX_RACERS; i++) {
+        if (racer_idx[i] == -1 ){
+            racer_idx[i] = addr;
+            return;
+        }
+    }
+}
 
+void removeRacer(int addr)
+{
+    for (int i=0; i<MAX_RACERS; i++) {
+        if (racer_idx[i] == addr ) {
+            racer_idx[i] = -1;
+            return;
+        }
+    }
 }
 
 //addr로 버퍼링 인덱스를 얻는다.

@@ -619,6 +619,16 @@ static void http_write( char *msg, int fd, int modem_addr) {
 
                 //전송 하지 않는다. 
 
+            }else if (!strcmp(jobname, "rfReset")) {
+                LOG_DEBUG("jobName : rfReset");
+                // RF reset
+                _rf_reset = 1;
+                
+                // set_cmd_id( _AT_START ); // +++ 전송
+                data_mode = _DATA_AT_MODE;
+
+                request_uart_send(_AT_START);
+
             }else if (!strcmp(jobname, "deletePairingInfo")) {
                 manaual_pairinig_status = _MANUAL_PAIRING_DELETE;
                 

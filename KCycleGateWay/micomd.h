@@ -328,7 +328,7 @@ char * getDevIDFromDevices(int dev_addr);
 int getDevicesIndexFromAddr(int dev_addr);
 void make_date_data(char * outtime_val);
 
-void putRacer(int addr);
+void addRacer(int addr);
 int getRacerIndex(int addr);
 
 void init_fd_masks();       // fd_masks 초기화
@@ -339,6 +339,7 @@ void del_all_socket();
 int get_cmd_state();
 void set_cmd_state(int cmd);
 int get_list_end();
+void removeRacer(int addr);
 //micomd extern global variable
 
 extern DATA_MODE_TYPE data_mode;
@@ -359,5 +360,6 @@ extern int race_res_offset[MAX_RACERS]; //버퍼링 오프셋
 extern int racer_idx[MAX_RACERS]; //addr로 레이서 index를 기롥
 extern int racer_count;
 extern int racer_addr[MAX_RACERS];
+extern int _rf_reset;
 #endif /* _MICOM_H_ */
 
