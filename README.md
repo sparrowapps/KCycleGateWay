@@ -143,15 +143,6 @@ TZ='Asia/Seoul'; export TZ
 
 
 
-## 디버거 nemiver GDB frontend
-~~~
-sudo apt-get update
-sudo apt-get upgrade
-sudo apt-get install nemiver    
-~~~
-
-## vscode
-vs code로 개발
 
 ## build & run
 ~~~
